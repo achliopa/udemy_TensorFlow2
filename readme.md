@@ -397,3 +397,375 @@ files.download('linearclassifier.h5')
 * with the feedforward NNs we will do multiclass classification
 
 ### Lecture 18. Forward Propagation
+
+* to make a prediction we need to keep forward direction in an NN (input -> output)
+* different neurons find different features
+* for computational model we assume neurons are same
+* same inputs can be fed to multiple neurons, each calculating something different
+* neuron inone layer can act as inputs to another layer
+* for a single neuron model we expressed it sigma(wTx+b)
+* for multiple neurons in a layer: zj = sigma(wjTx+bj),for j=1..M (M neurons in the layer)
+* if we consider z as a vector we can express it z=sigma(WTx+b)
+	* z is vector of size M (column vector of size Mx1
+	* x is a a vector of size D (column vector of size Dx1
+	* W is a matrix of size DxM (transposed MxD)
+	* b is a vector of size M
+	* sigma() is an element wise operation
+* for each layer we have such an equation. for an L layer network we have 
+	* p*y=1|x) = sigma(W^(L)T*z(L-1) +b(L)) for binary classification
+	* for linear regression p*y=1|x) = W^(L)T*z(L-1) +b(L) no sigmoid
+* Each neural network layer is a 'feature transformation
+* Each Layer learns increasingly complex features (e.g facial recognition)
+
+### Lecture 19. The Geometrical Picture
+
+* The neuron is interpretable
+	* large weight important feat
+	* small weights non-important feat
+* the linear model (neuron) is not very expressive
+* as we said to mak4e the problem more complicated we can
+	* add more dimensions (feats) to the linear problem
+	* make the pattern non linear (non linear separable)
+* the neuron model expresses a line or multidimensional plane
+* there is no setting of w and b to get a curve
+* One way to solve non-linear problems is feature engineering
+	* say salary is a quadratic function of years of experience. Yhat = ax^2 + bx + c
+	* this is still linear regression. x1 = x x2=x^2 => yhat = w1x1 + w2x2 + b
+* The problem with Feature engineering is there are too many possibilities
+* Another way to solve non-linear problems is by repeating a single neuron
+	* each neuron computes a different non-linear feat of the input
+	* its non-linear because of the sigmoid
+* a linear boundary in geometry takes the form of wTx+b (single neuron)
+* a 2-layer neural network boundary takes the form of
+	* W^(2)Tsigma(W^(1)Tx+b^(1))+b^(2)
+	* we cannot simplify this to alinear form
+* if we had no sigmoid we could reduce it to linear form: W'Tx+b'
+	* W' = W^(2)TW^(1)T
+	* b'= W^(2)Tb^(1)+b^(2)
+* With neurons we get Automated feature engineering. 
+* Ws and bs are random and found iteratively using gradient descent
+* No actual domain knowledge is needed.
+* This is the power of DL. it allows non-experts to build very good models
+* Checkout Tensorflow Playground in web
+
+### Lecture 20. Activation Functions
+
+* we have seen only the sigmoid activation function: sigma(a) = 1/(1+exp(-a))
+	* it maps vals to 0..1 
+	* it mimics the biological neuron
+	* it makes our NN decision boundary non linear
+* Sigmoid is problematic and not used very often
+	* we want to have all our inputs standardized. centered around 0 and all in same range
+	* sigmoid is problematic. its output is centered on 0.5 and not 0
+	* neurons must be uniform. the ones output is the nexts input.
+* Hyperbolic Tangent (tanh) solves this: tanh(a) = (exp(2a) - 1)/(exp(2a)+1)
+	* same shape as sigmoid but goes from -1 to +1
+	* tanh is still problematic
+* The problem with both is the Vanishing gradient problem
+	* we use gradient descen t to train the model
+	* this requeires finding the gradients of w parameters
+	* the deeper the network the more terms have to be multiplied by the gradient due to the chain rule of calculus
+	* a neural network is a chain of composite functions
+	* its output is essential sigmoid(sigmoid(sigmoid...)))
+	* we end up multiplying the derivative of the simoid over and over
+	* the derivative of the sigmoid is like a very flat bell shaped curve with low peak ~ 0.25
+	* it is essentially 0 in its most part. if we multiply small numbers we get even smaller
+	* the further we go from the output the less contribution from layers to the output
+	* the gradient vanishes the furtheOld ner back we go to the network
+	* layers further back are not trained at all
+* One old-shool solution from Geoff Hinton was the 'greedy layer-wise pretraining'
+	* train each layer greedly one after the other
+* other old school solutions: RBMs(restricted boltzman machines, Deep Boltzman machines)
+* The solution was simple. dont use activation functions with vanishing gradients
+* use the ReLU(rectifier linear unit) like the zener diode output: R(z) = max(0,z)
+	* in ReLU the gradient on the less side <0 is already 0 (vanished)
+	* this is a phenomenon of dead neurons. neurons that their input is small are not trained
+* ReLU works. rights side is enough to do the job
+* Solutions to solve the Dead Neuron problem: 
+	* Leaky ReLU (LReLU) => small positive slope for negative inputs. still non linear
+	* ELU (exponential linear unit) f(x) = x > 0 ? x : a(exp(x) -1)
+	* Softplus: f(x) = log(1+ exp(x)) like a smooth curved ReLU.
+* Authors claim ELU speeds up learning and imporves accuracy. negative values possible. mean close to 0 (unlike ReLU)
+* Both Softplus and ELU have vanishing gradients on left. but so does ReLU and works
+* Softplus and ReLU cant be centered around 0 (range 0 +inf)
+* it does not matter
+* the default in most models is ReLU. still if our results are not good enough we should experiment
+* use the computer and experiment
+* ReLU might be even more biological plausible than sigmoid. 
+* action potentials are same regardless of stimuli
+* their frequenry changes with stimuli intensity (voltage in receptors)
+* the RELU is like encoding the action potential frequency.
+	* zero minimum (no action potential)
+	* as the input increases in value also the output increases (in frequency) having larger effect downstream
+* Relationship between action potential frequency and stimulus intensity is non linear
+* it can be modeled as log() or root functions. (like decibel scale)
+* what we model is stimulus intensity vs action potential spikes /sec
+* The most recent and accurate activation method of Biological neurons is the BRU (Bionodal Root Unit)
+* its math equation is: f(z) = z >=0 ? (r^2z+1)^1/r - 1/r : exp(rz) -1/r
+* Not yet adopted by the DL community
+
+### Lecture 21. Multiclass Classification
+
+* for output layer sigmoid is the right choice for binary classification
+* for hideen layers choose ReLU
+* For Multiclass classification suppose we have reached the Final Layer
+	* a^(L) = W^(L)Tz^(L-1)+b^(L)
+	* a^(L) is a vector of size K(for a K-Class classifier)
+	* how do we turn this vector into a set of probabilities for each of the K classes?
+* Requirements for a Probaility
+	* we need a probaility distribution over K values p(y-k|x) >=0 and <=1
+	* probabilities must sum to 1 S[k=1->K]p(y=k|x) = 1
+* Softmax meets both requirements
+	* exp is always positive
+	* the denominatoor is the sum of all possible values of the numerator
+* In tensorflow `tf.keras.Dense(K,activation='softmax')`
+* Softmax is not meant for hidden layers unlike ReLU/sigmoid/tanh
+* So to recap:
+	* Regression: activation? none/Identity
+	* Binary Classification: activation? sigmoid
+	* Multiclass Classification: activation? Softmax
+
+### Lecture 22. How to Represent Images
+
+* NNs are most powerful with unstructured data: images, sound,text
+* we ll see how to classify images
+* we represent iages as matrix. 
+* each element has 3 nums, is the 3 colors content that makes the pixel (RGB)
+* so a color image is actually a 3D tensor HxWxC C=3 (RGB channels)
+* color in nature is continuous (analog) has infinite vals
+* 8bits precision is good enough to quantify colors. 16mil xolora
+* raw images can be big. we compress them for storage (JPEG)
+* Grayscale Images are 2D. they have 1 channel for color
+* matplotlib imshow plots images. default cmap(colormap) is heatmap
+* to pass in a NN we scale the image 8bit values from ints 8-255 to 0..1 vals (floats)
+* these vals although not centered around 0 are OK. they express probability
+* VGG network is famous in Computer Vision. 
+	* (image classivication.object detection et al). 
+	* it won ImageNet contest
+	* VGG does not scale. it subtracts the mean across each channel. 
+	* values are centered around 0 with range 0-255
+	* if we use tfs built-in VGG model. we need to preprocess the image with `tf.keras,applications.vgg16.preprocess_input`
+* NNs expect an input X of shape NxD (N=samples,D=feats)
+* An image has dimensions of HxWxC. it does not have D feats
+* A full dataset of images is a 4D tensor of dimensions NxHxWxC
+* To convert an image to a Feature Vector we flatten it out.with Flatten(). the image becomes NxD
+
+### Lecture 23. Code Preparation (ANN)
+
+* Steps we ll take:
+	* Load the data (MNIST dataset)
+	* Build the model (Multiple Dense layers, Output Layer. multiclass lg regression (softmax) 
+	* Train the model
+	* Evaluate the model
+	* Make Predictions
+* Load Data
+	* data already in `tf.keras.datasets`
+	* images 28x28 = 784 pixels or feats flattened out
+	* `(x_train,y_train),(x_test,y_test) = mnist.load.data()`
+	* Pixels vals will be scaled to 0..1
+	* tf.keras will do the flattening for us. we dont have to do it
+* Instantiate the model
+```
+model = tf.keras.models.Sequential([
+	tf.keras.layers.Flatten(input_shape=(28,28)),
+	tf.keras.layers.Dense(128,activation='relu'),
+	tf.keras.layers.Dropout(0.2),
+	tf.keras.layers.Dense(10,activation='softmax')
+])
+```
+* dropout is a way to reduce bias in our model
+* train the model
+```
+model.compile(optimizer='adam',
+	loss='sparse_categorical_crossentropy',
+	metrics=['accuracy'])
+model.fit(x_train,y_train)
+```
+* Cross-Entropy Loss
+	* we have K output probabilities for the K classes
+	* one=hot encoding the target means 9 is repressented as yOH=[0,0,0,0,0,0,0,0,0,1]
+	* Loss = -S[k=1->K]ykOHlog(yhatk) where yhatk=p(y=k|x)
+	* if our prediction is perfect y=1 => Loss = -1*log1=0
+	* if our prediction is totally wrong y=0 => Loss = -1*log0 = inf
+* Why the cross -entropy loss is sparce???
+	* to calculate cross-entropy both the one hot encoded targets and output probs must be arrays of K
+	* this is not optimal as target is just an int
+	* a on-hot array is sparce (9/10) vals are 0
+	* for all 0s we get 0, its redundant
+* Solution? Sparce-categorical -cross-entropy
+	* we consider a non -one-hot encoded target y=k*
+	* we need only the log of the k*th entry of the prediction
+	* we can index the prediction reducing computation by factor K
+	* it works because by default lables are 0based ints
+	* Loss = -log(yhat[k*])
+* Last step: evaluat ethe model and predict
+```
+model.evaluate(X,Y)
+model.predict(X)
+```
+
+### Lecture 24. ANN for Image Classification
+
+* we write down the code in Colabs
+```
+# Install and import TF2
+!pip install -q tensorflow==2.0.0
+import tensorflow as tf
+print(tf.__version__)
+# Load in the data
+mnist =tf.keras.datasets.mnist
+(x_train,y_train),(x_test,y_test) = mnist.load_data()
+x_train, x_test  = x_train / 255.0, x_test / 255.0
+print('x_train.shape:',x_train.shape)
+# Build the model
+model = tf.keras.models.Sequential([
+  tf.keras.layers.Flatten(input_shape=(28,28)),
+  tf.keras.layers.Dense(128,activation='relu'),
+  tf.keras.layers.Dropout(0.2),
+  tf.keras.layers.Dense(10,activation='softmax')
+])
+# Compile the model
+model.compile(optimizer='adam',
+  loss='sparse_categorical_crossentropy',
+  metrics=['accuracy'])
+# Train the model
+r = model.fit(x_train,y_train,validation_data=(x_test,y_test),epochs=10)
+# Plot the loss per iteration
+import matplotlib.pyplot as plt
+plt.plot(r.history['loss'],label='loss')
+plt.plot(r.history['val_loss'],label='val_loss')
+plt.legend()
+# Evaluate the model
+print(model.evaluate(x_test,y_test))
+```
+* we see a common problem in ML. the more we train the better we get with the train dataset without gain on the test set.
+* its called overfitting
+* we copy a useful script to printout confusion matrix
+```
+# Plot confusion matrix
+from sklearn.metrics import confusion_matrix
+import numpy as np
+import itertools
+
+def plot_confusion_matrix(cm,classes,normalize=False,title='Confustion matrix',cmap=plt.cm.Blues):
+  ###
+  # This function prints and plots the confustion matrix
+  # Normalization can be applied by setting 'normalize=True' 
+  ###
+  if normalize:
+    cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    print('Normalized confusion matrix')
+  else:
+    print('Confustion matrix, without normalization')
+    print(cm)
+    plt.imshow(cm, interpolation='nearest',cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks,classes,rotation=45)
+    plt.yticks(tick_marks,classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max()  / 2.
+    for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
+      plt.text(j,i, format(cm[i,j],fmt),
+        horizontalalignment='center',
+        color='white' if cm[i,j] > thresh else 'black')
+    
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
+
+p_test = model.predict(x_test).argmax(axis=1)
+cm = confusion_matrix(y_test,p_test)
+plot_confusion_matrix(cm,list(range(10)))
+
+# Do the results make sense?
+# its easy to confuse 9<->4, 9<->7, 2<->7 etc
+```
+* show examples of misclassified data
+```
+# Show some misclassified examples
+
+misclassified_idx = np.where(p_test != y_test)[0]
+i = np.random.choice(misclassified_idx)
+plt.imshow(x_test[i],cmap='gray')
+plt.title('True label: %s Predicted: %s' % (y_test[i],p_test[i]));
+```
+
+### Lecture 25. ANN for Regression
+
+* we cp a notebook in colab to do the job using synthetic data we will create
+```
+# Install and import TF2
+!pip install -q tensorflow==2.0.0
+import tensorflow as tf
+print(tf.__version__)
+# Other Imports
+import matplotlib.pyplot as plt
+import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
+# Make the dataset
+N = 1000
+X = np.random.random((N,2)) * 6 - 3 # uniform distribution between (-3,+3)
+Y = np.cos(2*X[:,0]) + np.cos(3*X[:,1]) # this implements the function y = cos(2xi) + cos(3x2)
+# Plot it
+fig = plt.figure()
+ax = fig.add_subplot(111,projection='3d')
+ax.scatter(X[:,0],X[:,1],Y)
+# plt.show()
+# Build the model
+model = tf.keras.models.Sequential([
+  tf.keras.layers.Dense(128, input_shape=(2,),activation='relu'),
+  tf.keras.layers.Dense(1)
+])
+# Compile and fit
+opt = tf.keras.optimizers.Adam(0.01)
+model.compile(optimizer=opt,loss='mse')
+r = model.fit(X,Y,epochs=100)
+# Plot the loss
+plt.plot(r.history['loss'],label='loss')
+# plot the prediction surface
+fig = plt.figure()
+ax = fig.add_subplot(111,projection='3d')
+ax.scatter(X[:,0],X[:,1],Y)
+# surface plot
+line = np.linspace(-3,3,50)
+xx,yy = np.meshgrid(line,line)
+Xgrid = np.vstack((xx.flatten(),yy.flatten())).T
+Yhat = model.predict(Xgrid).flatten()
+ax.plot_trisurf(Xgrid[:,0],Xgrid[:,1],Yhat,linewidth=0.2,antialiased=True)
+# plt.show()
+```
+* we see that fixed learnign rate is suboptimal approach. we need to schedule it
+* its impressive how we aproximate so close a cosine function without applying any method
+* to plot 3d
+	* we create the meshgrid
+	* we geenrate numbers with linspace
+	* we call meshgrid on the points
+	* we flatten the array for ML
+	* we do prediction of Y
+	* we pot the surface on the 3d axis system
+```
+# Can it extrapolate?
+# Plot the prediction surface
+fig = plt.figure()
+ax = fig.add_subplot(111,projection='3d')
+ax.scatter(X[:,0],X[:,1],Y)
+# surface plot
+line = np.linspace(-5,5,50)
+xx,yy = np.meshgrid(line,line)
+Xgrid = np.vstack((xx.flatten(),yy.flatten())).T
+Yhat = model.predict(Xgrid).flatten()
+ax.plot_trisurf(Xgrid[:,0],Xgrid[:,1],Yhat,linewidth=0.2,antialiased=True)
+# plt.show()
+```
+* we see a problem with extrapolation
+* we need a periodic activation method in our NN to fix that
+
+## Section 5: Convolutional Neural Networks
+
+### Lecture 26. What is Convolution? (part 1)
+
+* 
