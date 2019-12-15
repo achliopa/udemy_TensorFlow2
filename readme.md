@@ -18,22 +18,26 @@
 import pandas as pd
 df = pd.read_csv('arrhythmia.data',header=None)
 ```
+
 	* we extract the first 6 features and give them header
 ```
 data = df[[0,1,2,3,4,5]]
 data.columns = ['age','sex','height','weight','QRS duration','P-R interval']
 ```
+
 	* we printout a plot with feature histograms
 ```
 import matplotlib.pyplot as plt
 plt.rcParams['figure.figsize'] = [15,15]
 data.hist();
 ```
+
 	* we can easily do a dataset scatterplot with pandas
 ```
 from pandas.plotting import scatter_matrix
 scatter_matrix(data);
 ```
+
 * The tf.Keras way (using tensorflow)
 	* install and import tf2
 ```
@@ -41,23 +45,27 @@ scatter_matrix(data);
 import tensorflow as tf
 print(tf.__version__)
 ```
+
 	* set the url and use keras to get it from
 ```
 url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/auto-mpg.data'
 tf.keras.utils.get_file('auto_mpg.data',url)
 ```
+
 	* keras default folder for datasets is `/root/.keras/datasets/`
 	* after checking the file with `!head` we make a dataset out of it
 ```
 df = pd.read_csv('/root/.keras/datasets/auto_mpg.data',header=None,delim_whitespace=True)
 df.head()
 ```
+
 * The Manual Upload way using Colab
 	* with the code below we create an upload button  in notebook to upload local files 
 ```
 from google.colab import files
 uploaded = files.upload()
 ```
+
 	* the file is uploaded as a a python dictionary
 	* the file now resided in colab working dir
 	* many times we want to test various algos.
@@ -70,12 +78,14 @@ uploaded = files.upload() #fake_util.py
 from fake_util import MY_function
 my_function()
 ```
+
 * Access files from GDrive in Colab
 	* we import and mount gdrive (/content is our pwd)
 ```
 from google.colab import drive
 drive.mount('/content/gdrive')
 ```
+
 	* we can view our drive `!ls gdrive/'My Drive'`
 
 ### Lecture 7. Where can I learn about Numpy, Scipy, Matplotlib, Pandas, and
@@ -767,5 +777,516 @@ ax.plot_trisurf(Xgrid[:,0],Xgrid[:,1],Yhat,linewidth=0.2,antialiased=True)
 ## Section 5: Convolutional Neural Networks
 
 ### Lecture 26. What is Convolution? (part 1)
+
+* Convolution is the result of passing a filter (kernel) over a data series
+* in DSP is like passing a step function over a sample stream
+* In image prcessign is passing a kernel over an image
+* the math symbol of comvolution is the star (asterisc)
+* we can think it as feature transformation
+* blurring an image is by applying a gausian filter over it
+* the result is calculated by the inner product of the kernel with the affected area
+* If input length = N kernel length = K , output length = N-K+1
+* convolution pseudocode
+```
+input_image,kernel
+output_height = input_height -kernel_height +1
+output_width = input_width -kernel_width +1
+output_image = np.zeros((output_height, output_width)
+for i in range(0,output_height):
+	for j in range(0,output_width):
+		for ii in range(0,kernel_height):
+			for jj in range(0,kernel_width):
+				output_image[i,j]+=input_image[i+ii,j+jj]*kernel[ii,jj]		
+```
+* images by default are not square, 
+* kernels are almost always square by convention
+* Convolution equation: (A * w)ij=S[i'=1->K]S[j'=1->K]A(i+i',j+j')w(i',j')
+* TF does the calculation for us
+* More formal equation: Input=Y,Filter=X,Output=Z
+	* Z(i,j)=S[m=1->M]S[n=1->N]X(m,n)Y(i-m,j-n)
+* As we use GRadient Descent it does not matter if in our filters convolution we use + or -
+* Scipy has a convolution method `from scipy.signal import convolve2d`
+	* the result is different as it does proper convolution with - and not the DL version with +
+* to produse the DL version with scipy we need to flip the filter
+	* `convolve2d(A,np.fliplr(np.flipud(w)), mode='valid')`
+* What we actually do in DL is called 'cross-correlation'
+* mode= valid is usedbecause the moveement of the filter is always bvounded by the limits of the image. 
+* the output is always smaller thant the input
+* if we want to have same size we can use padding (zeros)
+* even with single padding we lose context. 
+* we can have full padding : output_lenght = N+K-1 to dont miss out info
+* The 3 Modes of convolution
+	* Valid: Output_size=N-K+1 : Typical usage
+	* Same: Output_size=N : Typical usage (no padding)
+	* Full: Output_size=N+K-1 : ATypical usage
+
+### Lecture 27. What is Convolution? (part 2)
+
+* Vectorization of operations is desirable because numpy vectors are way faster than for loops
+* we can use it to simplify convolution using inner product to look like: aTb = S[i=1->N]aibi =|a||b|cos(theta ab)
+* Dot product is called cossine similarity or cosine distance
+* for angle=0 cosine is 1 for angle =90deg cosine is 0 for angle=180deg cosine is -1
+* cosine is an expression of similarity in vectors
+* Pearson Correlation is almost same as cosine but with mean subtraction
+* Pab = S[i=1->N](ai-a_)(bi-b_)/((sqrt(S[i=1->N](ai-a_)^2)(sqrt(S[i=1->N](bi-b_)^2))
+* Dot product is a correlation measure
+	* high positive correlation-> dot product large and positive
+	* high negative correlation-> dot product large and negative
+* Convolution  is a pattern finder
+
+### Lecture 28. What is Convolution? (part 3)
+
+* Equivalence of convolution in matrix multiplication
+* 1D convolution is same as 2D without the 2nd index bi = S[i'=1->K]ai+i'wi'
+* by repeating same filter again and again inside a matrix we can do convolution doing matrix multiplication
+* problem is it takes too much space.
+* sometimes instead of doing matric multiplication we can replace it with convolution
+* in a = WTx what if instead of a full weight matrix W we used 2 weights repeated
+* we could do convolution and save on Ram and time
+* typical input vectors in modern CNNs are sized at scale of 10^5 feats.
+* matrix multiplication can explode in complexity
+* a dense layer would treat a feat in a different position of an image as different
+
+### Lecture 29. Convolution on Color Images
+
+* Color images are 3D objects
+* in 3D is like convoluting a cube through a box of same depth.
+* we actually add an index and a sumamtion in comvolution but we now the K = 3
+* Input is HxWx3, Kernel is KxKx3, output image (H-K+1)x(W-K+1) 3rd dimension vanishes.
+* Shape of bias term
+	* in a dense layer, if WTx is avector of size M , b is also of size M
+	* in a conv layer b does not have the same shape as W*x 
+	* technically this is not allowed by rules of matrix arithmentic
+	* the rules of broadcasting (in Numpy code) allow it
+	* if W*x has shape of HxWxC2 b is a vector of size C2 (one scalar per feature map)
+* By convolution vs matrix multiplication we save massively
+* since convolution is a part of the neural network layer. its easy to think how filters will be found
+* conv is a pattern finder/shared-param matrix multiplication / feature transformer
+* W fill be found  through training with gradient descent.
+
+### Lecture 30. CNN Architecture
+
+* Modern CNNs originate from LeNet (Yann LeCun)
+* A typical Architecture is Conv->Pool->Conv->Pool->Conv->Pool->Dense->Dense->Output
+* Stage 1 of Conv->Pool is like a Feature transformer to feed feats in the ANN of stage 2
+* Stage 2 is a non-linear classifier
+* Pooling is another name for Downsampling (making a smaller image out of a bigger one)
+* if a poolsize is 2 an 100x100image becomes 50x50 (Downsample by 2)
+* there are 2 types of pooling. max pooling and avg pooling. max pooling is more common and faster
+* Why we do it? a) we hav eless data to process downstream, b) we dont care where the feat ccured, just that it did
+* We call this 'Translational Invariance'. we humans do the same
+* the input for pooling is the pattern finder matrix. max pooling preserves context. if it was found the info will persist downstream
+* Pooling boxes can overlap (this is called stride)stride controls pixel shifting between subling next subsampling operation
+* after each conv/pool step image shrinks but filter size stays the same
+* initially filter looks for tiny patterns (lines,curves) then as image shrinks it looks for increasingly complex features
+* while we lose spatial info in the proces we get feature info as we get more feature maps
+* CNN standard conventions to start with
+	* small filters relative to image: 3x3, 5x5, 7x7
+	* repeat convolution->pooling pattern
+	* increase # of feature maps 32->64->128->128
+	* read papers on the subject
+* we can avoid pooling by doing strided convolution
+* neighbor pixels are typically highly correlated
+* when image comes out of 1st stage is 3d we need to reshape it before feeding it to 2nd stage using Flatten() layer
+* Global Max pooling layer can fix the problem of differnet sized images (eg from internet)
+* we do global max pooling before we feed the FNN 
+* if our images are too small we get error when we apply global max pooling
+
+### Lecture 31. CNN Code Preparation
+
+* Step 1: Load in the data (Fashion MNIST and CIFAR-10)
+	* Fashion MNIST (28x28 grayscale clothes) 10 classes
+	* CIFAR-10 32x32x3 color objects 10classes
+* Step 2: Build the model
+	* conv->pool->Conv-->pool->FNN
+	* Learn Functional API
+* Step 3: Train the model
+* Step 4: Evaluate model
+* Step 3: Make Predictions
+* Later on: Data Augmentation. produce more images from original dataset (rotate etc, mirror)
+* Loading the Data:
+	* CIFAR-10: `tf.keras.datasets.cifar10.load)data()`
+	* Fashion MNIST: `tf.keras.datasets.fashion_mnist.load_data()`
+	* `(x_train,y_train),(x_test,y_test)=load_data()`
+* CNN expects NxHxWxC input. Fashion MNIST is Nx28x28. we need to reshape it to Nx28x28x1.
+* CFAR-10 labels are Nx1 we need to flatten() them
+* Build the model
+* We will use Keras functional API
+* Keras is an API spec independent of TF
+* Keras inventor works for Google who created TF. so its is built in
+* if we use Keras library separate from backend we might have version mismatch
+* Keras the TF module works by default 
+* Keras Standard API
+
+```
+model = Sequential([
+	Input(shape=(D,)),
+	Dense(128, activation='relu'),
+	Dense(K,activation='softmax')
+])
+...
+model.fit()
+...
+```
+
+* Keras Functional API
+
+```
+i = Input(shape=(D,))
+x = Dense(128, activation='relu)(i)
+x = Dense(K,activation='softmax')(x)
+model = Model(i,x)
+...
+model.fit()
+...
+```
+
+* we see that keras objects work as functions
+* Keras Functioanl API: looks cleaner, easier to create model branches, models with multiple inputs outputs
+* eg we can feed the input in 2 layers in parallel
+* CNN with functional API
+
+```
+i = Input(shape=x_train[0].shape)
+x = Conv2d(32, (3,3), strides=2, activation='relu')(i)
+x = Conv2d(64, (3,3), strides=2, activation='relu')(x)
+x = Conv2d(128, (3,3), strides=2, activation='relu')(x)
+x = Flatten()(x)
+x = Dense(512, activation='relu')(x)
+x = Dense(K, activation='softmax')(x)
+model = Model(i,x)
+```
+
+* conv is 2d because color channel is not a spatial dimension
+* speech would require a 1d convolution
+* video would require a 3d convolution
+* we can use 3d convolution to operate on 3d objects (voxels)
+* in conv layers we specify also padding mode (valid,same.,full)
+* first params is the # of feature maps to generate
+* using Dropouts between Convolutions is a controversial issue. mostly wrong
+
+### Lecture 32. CNN for Fashion MNIST
+
+* set the colab notebook for FashionMNIST 
+
+```
+# Install and import TF2
+!pip install -q tensorflow==2.0.0
+import tensorflow as tf
+print(tf.__version__)
+# Additional Imports
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.layers import Input,Conv2D,Dense,Flatten,Dropout
+from tensorflow.keras.models import Model
+# Load in the data
+fashion_mnist = tf.keras.datasets.fashion_mnist
+
+(x_train,y_train),(x_test,y_test) = fashion_mnist.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0
+print('x_train.shape:', x_train.shape)
+# the data is only 2d
+# convolutional layer expects HxWxC
+x_train = np.expand_dims(x_train, -1)
+x_test = np.expand_dims(x_test, -1)
+print(x_train.shape)
+# number of classes
+K = len(set(y_train))
+print('number of classes: ',K)
+# build the model using the functional API
+i = Input(shape=x_train[0].shape)
+x = Conv2D(32, (3,3), strides=2, activation='relu')(i)
+x = Conv2D(64, (3,3), strides=2, activation='relu')(x)
+x = Conv2D(128, (3,3), strides=2, activation='relu')(x)
+x = Flatten()(x)
+x = Dropout(0.2)(x)
+x = Dense(512, activation='relu')(x)
+x = Dropout(0.2)(x)
+x = Dense(K, activation='softmax')(x)
+
+model = Model(i,x)
+# Compile and fit
+# note: make sure we are using a GPU enabled notebook for this
+model.compile(optimizer='adam',
+  loss='sparse_categorical_crossentropy',
+  metrics=['accuracy'])
+r = model.fit(x_train,y_train, validation_data=(x_test,y_test), epochs=15)
+# Plot loss per iteration
+plt.plot(r.history['loss'], label='loss')
+plt.plot(r.history['val_loss'], label='val_loss')
+plt.legend()
+# Plot accuracy per iteration
+plt.plot(r.history['accuracy'], label='accuracy')
+plt.plot(r.history['val_accuracy'], label='val_accuracy')
+plt.legend()
+```
+
+* we see that the model is overfitting
+* model is getting more confident on its incorrect predictions
+* we plot the confusion matrix diagram
+
+```
+# Plot confusion matrix
+from sklearn.metrics import confusion_matrix
+import numpy as np
+import itertools
+
+def plot_confusion_matrix(cm,classes,normalize=False,title='Confustion matrix',cmap=plt.cm.Blues):
+  ###
+  # This function prints and plots the confustion matrix
+  # Normalization can be applied by setting 'normalize=True' 
+  ###
+  if normalize:
+    cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    print('Normalized confusion matrix')
+  else:
+    print('Confustion matrix, without normalization')
+    print(cm)
+    plt.imshow(cm, interpolation='nearest',cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks,classes,rotation=45)
+    plt.yticks(tick_marks,classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max()  / 2.
+    for i, j in itertools.product(range(cm.shape[0]),range(cm.shape[1])):
+      plt.text(j,i, format(cm[i,j],fmt),
+        horizontalalignment='center',
+        color='white' if cm[i,j] > thresh else 'black')
+    
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
+
+p_test = model.predict(x_test).argmax(axis=1)
+cm = confusion_matrix(y_test,p_test)
+plot_confusion_matrix(cm,list(range(10)))
+# label mapping
+labels = '''T-shirt/top
+Trouser
+Pullover
+Dress
+Coat
+Sandal
+Shirt
+Sneaker
+Bag
+Ankle boot'''.split()
+# Show some misclassified examples
+
+misclassified_idx = np.where(p_test != y_test)[0]
+i = np.random.choice(misclassified_idx)
+plt.imshow(x_test[i].reshape(28,28),cmap='gray')
+plt.title('True label: %s Predicted: %s' % (labels[y_test[i]],labels[p_test[i]]));
+
+### Lecture 33. CNN for CIFAR-10
+
+* we repeat the process for CIFAR-10
+
+```
+# Install and import TF2
+!pip install -q tensorflow==2.0.0
+import tensorflow as tf
+print(tf.__version__)
+# Additional Imports
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.layers import Input,Conv2D,Dense,Flatten,Dropout, GlobalMaxPooling2D
+from tensorflow.keras.models import Model
+# Load in the data
+cifar10 = tf.keras.datasets.cifar10
+
+(x_train,y_train),(x_test,y_test) = cifar10.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0
+y_train,y_test = y_train.flatten(),y_test.flatten()
+print('x_train.shape:', x_train.shape)
+print('y_train.shape:', y_train.shape)
+# number of classes (find number of unique elements using set)
+K = len(set(y_train))
+print('number of classes: ',K)
+# build the model using the functional API
+i = Input(shape=x_train[0].shape)
+x = Conv2D(32, (3,3), strides=2, activation='relu')(i)
+x = Conv2D(64, (3,3), strides=2, activation='relu')(x)
+x = Conv2D(128, (3,3), strides=2, activation='relu')(x)
+x = Flatten()(x)
+x = Dropout(0.5)(x)
+x = Dense(1024, activation='relu')(x)
+x = Dropout(0.2)(x)
+x = Dense(K, activation='softmax')(x)
+
+model = Model(i,x)
+# Compile and fit
+# note: make sure we are using a GPU enabled notebook for this
+model.compile(optimizer='adam',
+  loss='sparse_categorical_crossentropy',
+  metrics=['accuracy'])
+r = model.fit(x_train,y_train, validation_data=(x_test,y_test), epochs=15)
+# Plot loss per iteration
+plt.plot(r.history['loss'], label='loss')
+plt.plot(r.history['val_loss'], label='val_loss')
+plt.legend()
+# Plot accuracy per iteration
+plt.plot(r.history['accuracy'], label='accuracy')
+plt.plot(r.history['val_accuracy'], label='val_accuracy')
+plt.legend()
+```
+* again we are overfitting
+
+### Lecture 34. Data Augmentation
+
+* data augmentation helps us improve our model
+* we produce multiple samples from one sample by manipulating (*without losing the feat we look for)
+* it adds translational invariance
+* deep learning keeps improving because data keeps increasing
+* the more data we invent the more space it takes
+* google colab wont have the space either
+* it can be doen automatically
+* Keras API delivers
+* we need to know about generators and iterators
+* in python2 for loops when we use `for i in range(10)` it creates the range
+* if we use `xrange()` in python2  python does not create the list at all
+* in python 3 this is default for `range()` if we `print(range(10)` we get `range(0,10)` which is not a list
+* in python we can create a random generator using yield without ever creating a list in memory
+
+```
+def my_random_geenrator():
+	for _ in range(10):
+		x = np.random.randn()
+		yield x
+```
+
+* Keras does the same to do data augmentation on the fly, the pseudocode would be:
+
+```
+def my_image_augmentation_generator():
+	for x_batch,y_batch in zip(x_train,y_train):
+		x_batch = augment(x_batch)
+		yield x_batch,y_batch
+```
+
+* The code for the autogenerator in Keras is
+
+```
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+data_generator = ImageDataGenerator(
+	width_shift_range=0.1,
+	height_shift_range=0.1,
+	horizontal_flip=True
+)
+
+train_generator = data_generator.flow(
+	x_train,y_train,batch_size)
+
+steps_per_epoch = x_train.shape[0] // batch_size
+r_model.fit_generator(
+	train_generator,
+	steps_per_epoch=steps_per_epoch,
+	epochs=50)
+```
+
+* other args we can use 'rotation_range,vertical_flip,shear_range,zoom_range,brightness_range'
+* be careful to keep semantical context
+* when using a generator we need to set the steps per epoch.
+* otherwise generating will keep doing its job indefinitely...
+* fit_generator also returns history for plotting
+
+### Lecture 35. Batch Normalization
+
+* We will see the intermediate normalization/standarization layer used in CNNs
+* we have seen how important is to normalize/standardize data before passing them into linear/logistic regression
+* the problem is only input data get normalized. after passing from adense layer data is no longer normalized
+* We can solve this with Batch Normalization
+	* In TF with `model.fit()` we do batch gradient descent
+
+```
+for epoch in range(epochs):
+	for x_batch,y_batch in next_batch(x_train,y_train):
+		w <- w - learning_rate * grad(x_batch,y_batch)
+```
+
+* In our models we inject Layers that do Batch Normalization
+	* the layer looks at each batch of data, 
+	* calculates the mean and standard deviation on the fly
+	* standardazes based on that z=(x-mean)/stddev
+	* How do we know the normalization is good??? we dont
+	* Batch normalization fixes this. it starts with mean and stdev based on data. 
+	* then it shifts them to optimal with gradient descent.
+	* z = (x-meanB)/stddevB y = zgamma+betta (gamma,betta are leatrnt)
+* Batch Normalization acts as a regularizer, prevents overfitting like Dropout
+* How Batch Norm does Regularization?
+	* every batch is different so we get different batch mean and stddev
+	* there is no true mean and dev for the whole dataset
+	* this acts as noise, using noise in the model it makes it resilient to noise.
+	* when we fit to the noise we overfit
+* Batch norm is not applied between dense layers. there we use dropout
+* It is used between Convolution layers in CNNs
+
+### Lecture 36. Improving CIFAR-10 Results
+
+* we will improve the CIFAR10 results by applying the new techiques we learned
+* our new model
+
+```
+# build the model using the functional API
+# inspired by VGG
+i = Input(shape=x_train[0].shape)
+x = Conv2D(32, (3,3),activation='relu',padding='same')(i)
+x = BatchNormalization()(x)
+x = Conv2D(32, (3,3),activation='relu',padding='same')(i)
+x = BatchNormalization()(x)
+x=  MaxPooling2D((2,2))(x)
+x = Conv2D(64, (3,3),activation='relu',padding='same')(i)
+x = BatchNormalization()(x)
+x = Conv2D(64, (3,3),activation='relu',padding='same')(i)
+x = BatchNormalization()(x)
+x=  MaxPooling2D((2,2))(x)
+x = Conv2D(128, (3,3),activation='relu',padding='same')(i)
+x = BatchNormalization()(x)
+x = Conv2D(128, (3,3),activation='relu',padding='same')(i)
+x = BatchNormalization()(x)
+x=  MaxPooling2D((2,2))(x)
+x = Flatten()(x)
+x = Dropout(0.2)(x)
+x = Dense(1024, activation='relu')(x)
+x = Dropout(0.2)(x)
+x = Dense(K, activation='softmax')(x)
+
+model = Model(i,x)
+```
+
+* we fit with generator
+
+```
+# Fit with data augmentation
+# if we run this after starting previous fit it will continue where it left off
+batch_size = 12
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+data_generator = ImageDataGenerator(
+	width_shift_range=0.1,
+	height_shift_range=0.1,
+	horizontal_flip=True
+)
+
+train_generator = data_generator.flow(
+	x_train,y_train,batch_size)
+
+steps_per_epoch = x_train.shape[0] // batch_size
+r = model.fit_generator(
+	train_generator,
+  validation_data=(x_test,y_test),
+	steps_per_epoch=steps_per_epoch,
+	epochs=50)
+```
+
+## Section 6: Recurrent Neural Networks, Time Series, and
+Sequence Data
+
+### Lecture 37. Sequence Data
 
 * 
