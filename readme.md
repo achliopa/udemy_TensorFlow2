@@ -88,8 +88,7 @@ drive.mount('/content/gdrive')
 
 	* we can view our drive `!ls gdrive/'My Drive'`
 
-### Lecture 7. Where can I learn about Numpy, Scipy, Matplotlib, Pandas, and
-Scikit-Learn?
+### Lecture 7. Where can I learn about Numpy, Scipy, Matplotlib, Pandas, andScikit-Learn?
 
 * we have done in it JPortillas courses
 * tutor offers a free course [Numpy Stack](https://www.udemy.com/course/deep-learning-prerequisites-the-numpy-stack-in-python/)
@@ -1081,11 +1080,11 @@ misclassified_idx = np.where(p_test != y_test)[0]
 i = np.random.choice(misclassified_idx)
 plt.imshow(x_test[i].reshape(28,28),cmap='gray')
 plt.title('True label: %s Predicted: %s' % (labels[y_test[i]],labels[p_test[i]]));
+```
 
 ### Lecture 33. CNN for CIFAR-10
 
 * we repeat the process for CIFAR-10
-
 ```
 # Install and import TF2
 !pip install -q tensorflow==2.0.0
@@ -1288,5 +1287,401 @@ r = model.fit_generator(
 Sequence Data
 
 ### Lecture 37. Sequence Data
+
+* Time Series AKA Sequence = Any continuous-valued measurement taken periodically (e.g sensor data, stock data)
+* Forecasting can have multiple benefits
+* e.g Weather is dynamc and difficult to predict
+* speech and audio are time series
+* Text is an example where DL excels. in classical ML we use the 'Bag of Words' feature vector
+* Bag of Words
+  * e.g document classification
+  * create a long feature vector (one netry for each word in English vocabulary)
+  * Inside this vector we put a count of how many times each word appeared in the text
+  * our data set will compose of each documents feature vector and its lable
+  * when we only use counts we lose contex of the order of the words
+* Sequence
+  *  1D time series
+  *  just like with linear regressin we can expand the concept to multiple dimensions
+  *  For non-sequential (e.g tabular) data we have an NxD matrix
+* Shape of Sequence
+  * length? N? D? N=#samples D=#features
+  * T = sequence length (T for time)
+  * Our data is represented as a 3D array of size NxTxD
+* Example: Location Data
+  * model employee path to work recording GPS data from cars
+  * N: one sample would be one person's single trip to work
+  * D: =2 (GPS will record Latitude and Longitude pairs)
+  * T: the number of (lat,lng) measurements taken from start to finish of a single trip
+* Variable Length Sequence
+  * each trip has different number of samples T
+  * TF/Keras work with equal sized Tensors
+* Example: Stock Prices
+  * just a single value: D=1
+  * suppose we use a time window of 10 samples T=10 to predict the next sample
+  * N = number of time windows in the time series (say L samples) N=L-T+1
+  * more like 1D convolution
+  * if we want to measure 500 stocks? D = 500 . if T=10 a sample will be TxD = 5000
+* Example. Neural Interfaces
+  * D = # of electrodes in the brain
+  * Predict the leteer we want to type using 1sec of measurements with sampling rate of 1sample/ms
+  * T = 1000
+  * N = #of letters our test subject tried to type
+  * D = # of electrodes
+* Why NxTxD??
+  * all ML libraries in Python conform with this standard
+  * we use to put the number of features last
+* Variable length sequences
+  *  in the past we used variable length sequences in RNN. 
+  *  this is very compicated to work with and are inefficient data structs
+  *  NxTxD is a single array (numpy arrays are fast)
+  *  if T depends on which sample, we might use T(n) instead. we would have to use a list (inefficient)
+* In TF and Keras we use constant length sequences if we dont want to use custom code
+* We use padding with 0s. NN thinks all NxTxD array is full of legit data so we waste resources
+
+## Lecture 38. Forecasting
+
+* many do it in a way that looks nice but does not make sense
+* for us Forecsting means to predict the next values (multiple) of a time series
+* Number of future steps we want to predict is called the horizon 
+  * e.g predict demand for next 3-5 days for product manufacturing
+  * hourly weather for next 7 days 7x24 = 168
+* it makes virtually no sense to predict just one step ahead
+* Simplest way to do a forecast given an 1-D time series?? Linear Regression
+  * Most 'time series analysis' involves only linear regression
+  * If our data is NxTxD and linear regression expects only NxD, how it works??
+  * For 1-D time series D=1 (superfluous) so it is an NxT array if we flatten NxTx1
+  * To do linear regression we pretend T is D
+* Example.
+  * time series of length 10 [1,2,3,2,1,2,3,2,1,2]
+  * predict next val using past 3 vals
+  * input matrix (x) has shape Nx3, target(Y) has shape N = num of time windows that fit in the time series
+  * because we wnat to predict next val we cannot use all  = 10-3+1 = 8 but 7 (we can think of it as winodw is size 4 including the target)
+  * This is called an 'AutoRegressive Model (AR)' in statistics xhatt= w0+w1xt-1+w2xt-2+w3xt-3
+* How we forecast with AR?
+  * put Xtest into `model.predict(Xtest)` to yield prediction for x11, x12,x13
+  * this is wrong. forecasting is about predicting multiple steps ahead. 
+* In order to predict multiple steps ahead we must use our earlier predictions as inputs
+* Beacuse we must use our own predictions we cant just do `model.predict()` in one step
+```
+x = last_values_of_train_set
+predictions=[]
+for i in range(length_of_forecast):
+  x_next = model.predict(x)
+  predictions.append(x_next)
+  x = concat(x[1:], x_next)
+```
+
+* Can we apply this rule to make more powerful predictor?
+* A limitation of linear regression is that prediction can be a linear function of inputs
+* ANN is more powerful using same interface
+* Linear Regression Model
+```
+i = Input(shape=(T,))
+x = Dense(1)(i)
+model = Model(i,x)
+```
+
+* ANN non-linear
+```
+i = Input(shape=(T,))
+x = Dense(10,activation='relu')(i)
+x = Dense(1)(x)
+model = Model(i,x)
+```
+
+### Lecture 39. Autoregressive Linear Model for Time Series Prediction
+
+* we will write down a notebook for an AR model using a synthetic dataset
+```
+# Install and import TF2
+!pip install -q tensorflow==2.0.0
+import tensorflow as tf
+print(tf.__version__)
+# Additional imports
+from tensorflow.keras.layers import Input,Dense
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import SGD,Adam
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+# Make the original data
+series = np.sin(0.1*np.arange(200)) #+ np.random.randn(200)*0.1
+
+# Plot it
+plt.plot(series)
+
+### Build the dataset
+# lets see if we cn use T past values to predict the next value
+T = 10
+X = []
+Y = []
+for t in range(len(series) -T):
+  x = series[t:t+T]
+  X.append(x)
+  y = series[t+T]
+  Y.append(y)
+
+X = np.array(X).reshape(-1,T)
+Y = np.array(Y)
+N = len(X)
+print("X.shape",X.shape,"Y.shape",Y.shape)
+
+# Try the autoregressive linear model
+i = Input(shape=(T,))
+x = Dense(1)(i)
+model = Model(i,x)
+model.compile(
+    loss="mse",
+    optimizer=Adam(lr=0.1),
+)
+
+# train the RNN
+r = model.fit(
+    X[:-N//2],Y[:-N//2],
+    epochs=80,
+    validation_data=(X[-N//2:],Y[-N//2:]),
+)
+```
+
+* we train in the first half of the dataset and validate on the second half of the dataset
+* loss is almost 0
+* next we will do a 'wrong' forecast using true targets
+* NOTE! `model.predict()` returns NxK output .for us N = 1 and K=1
+```
+# "Wrong" forecast using true targets
+
+validation_target = Y[-N//2:]
+validation_predictions = []
+
+# index of first validation input
+i = -N//2
+
+while len(validation_predictions) < len(validation_target):
+  p = model.predict(X[i].reshape(1,-1))[0,0] #1x1 array => scalar
+  i += 1
+  # update the predictions list
+  validation_predictions.append(p)
+
+plt.plot(validation_target, label='forecast target')
+plt.plot(validation_predictions, label='forecast prediction')
+plt.legend()
+```
+
+* results are correct
+* next we forecast the correct way using only self-predictions for making predictions)
+
+```
+# Forecast future values (use only self-predictions for making predictions)
+
+validation_target = Y[-N//2:]
+validation_predictions = []
+
+# last train input
+last_x = X[-N//2] #!-D array of length T
+
+while len(validation_predictions) < len(validation_target):
+  p = model.predict(last_x.reshape(1,-1))[0,0] #1x1 array => scalar
+
+  # update the predictions list
+  validation_predictions.append(p)
+
+  # make the new input
+  last_x = np.roll(last_x,-1)
+  last_x[-1] = p
+plt.plot(validation_target, label='forecast target')
+plt.plot(validation_predictions, label='forecast prediction')
+plt.legend()
+```
+* again the prediction is perfect (no noise signal)
+* we add noise uncommenting `#+ np.random.randn(200)*0.1` and rerun
+* wrong forecast gives almost perfect result. but its misleading
+* the proper forecast predicts the main pattern (sinusoidal) but it filters out all the noise
+
+### Lecture 40. Proof that the Linear Model Works
+
+* How linear regression can forecast a non-linear signal like sinusoidal
+* It is possible to predict perfectly a clear sine wave using only 2 previous values
+* this is called the AR(2) model
+* no bias term is needed x(t)=w1x(t-1)+w2x(t-2)
+* if we want to write a timeseries as a function of time it looks like x(t)=sin(ωt)
+* we used that whenwe made our time series `np.sin(0.1*np.arange(200))` where `np.arange(200)` are the values of t and 0.1 the angular frequency
+* We can now prove our AR(2) modl can learn the sine wave
+* we plug the sine wave function to the recurrence relation sin(ω(t+1)) = w1sin(ωt) +w2sin(ω(τ-1))
+* derivation is easier when we shift by 1 starting at t+1
+* Fibonacci is another example of a recirrence relation where weight are 1 Fib(n)=Fib(n-1)+Fib(n-2)
+* then we multiply by ω: sin(ω(t+1))=w1sin(ωt)+w2.sin(ω(t-1)) => sin(ωt+ω)=w1sin(ωt)+w2.sin(ωt-ω) => sin(ωt+ω) -w2.sin(ωt-ω)=w1sin(ωt) 
+* we know sin(a+b)+sin(a-b)=2cos(b).sin(a) smae like ours where w1 = 2cos(b) and w2 = -1 ωτ=a ω=b
+
+### Lecture 41. Recurrent Neural Networks
+
+* We approached CNNs with ANN in mind flattening images and treating them as feature vectors
+* We also aproached time sequence data pretending T is D (for 1D sequence) and passing it in a NxT matrix as Input for tabular data model
+* what if D>1?
+* Why not flattne it out makeing our TxD series a single feature vector? we ve done this with images already
+* 1st problem: Full matric Multiplication Takes Up Space. In CNNs we took advantage of data structure to use convolution
+* RNNs do the same unlike ANNs that are generic
+* How we can exploit the structure of the sequence?
+  * we take inpiration from forecasting
+  * we know that to predict an x value past values are useful
+  * what if we apply this to the hidden layer feature vectors?
+  * hidden vector is calculated from input: h = σ(WhTx+bh)
+  * output is calculated from hidden vector: yhat = σ(WoTx+bo)
+  * To make an RNN we make the hidden feature vector depend on previous hidden state (its previous value)
+  * recurrent loop implies a time delay of 1
+  * linear regression forecasting model: output is linear function of inputs
+  * now: hidden layer is a non-linear function of input and past idden state?what kind of non-liear function? a neuron
+* RNN equation:
+  * Typically use 1 hidden layer (unlike CNN)
+  * h(t) is a non linear function of h(t-1) and x(t)
+  * Elman Unit or Simple Recurent Unit: ht=σ(WxhTxt+WhhTht-1+bh) x:input,h:hidden,o:output,xh:input-to-hidden,hh:hidden-to-hidden(recursive)
+  * yhat=σ(WoTht+bo)
+* How do we calculate output prediction given a sequence of inputs
+  * Sequence of input vectors: x1,x2,...,xT , Shape(xt) = D
+  * From x1 we get h1 and then yhat1 => h1 = σ(WxhTx1+WhhTh0+bh) h1 depends on h0 => yhat1 => σ(WoTh1+bo)
+  * h0 is the initial hidden state, can be a learned param.in TF is not learnable. just assume its 0
+  * Next we repeat for x2 to get h2 and then yhat2 => h2 = σ(WxhTx2+WhhTh1+bh) => yhat2 => σ(WoTh2+bo)
+  * we repeat to hT and yhatT. it becomes clear that each yhatT depends on x1,x2...,xt but not xt+1,...,xT
+* why we have a yhat for each time step?? if we do forecasting we care about next value
+* for these problems all yhats except from last are ignored. Keep only yhatT=f(x1,x2,..,xT)
+* there are some cases when we want to keep all the yhats. e.g when we doNeural machine  Translation. (both input and output series are meaningful sentences)
+* For ANN or CNN output is the probaility of y to be in each category given the input p(y=k|x)
+* Machine Translation is classification because the target is a word (a class in the diccionary)
+* What is the given in this case?? p(yt=k|?)
+* An unrolled RNN is a NN rolled out in time states 1,2,...T where each hidden layer h connects to nest time step h layer
+* its clear that the given in an RNN are all the x p(yT=k|x1,x2...,xT)
+* The Relationship to Markov Models become apparent
+  * The Markov assumption is that the current value depends only on the immediate previous value p(xt|xt-1,xt-2,..,x1) = p(xt|xt-1)
+  * thats absurd. if the current word is the how can we forecast the next word?
+* An RNN on the other hand is much more powerful as it will do the forecast based on ALL previous words
+* We put down some Pseudocode to show RNNs
+```
+Wxh = input to hidden layer
+Whh = hidden to hidden layer
+bh = hidden bias
+Wo = hidden to output weight
+bo = output bias
+X = TxD input matrix
+
+tanh hidden activation
+softmax output activation
+
+Yhat = []
+h_last = h0
+for t in range(T):
+  h_t = tanh(X[t].dot(Wx) + h_last.dot(Wh) +bh)
+  yhat = softmax(h_t.dot(Wo)+bo)
+  Yhat.append(yhat)
+  # update h_last
+  h_last = h_t
+```
+
+* There is biological inspiration in RNNs. there is no reason for neuron to go only in 1 direction
+* Hopfield networks are loop neuron networks in Brain. one way to train them is Hebbian Learning
+  * neurons that fire together wire together, and neurons that fire out of sync fail to link 
+* also in electronics RNNs have similarity with resgisters and memory
+* What are the savings of RNN against an ANN.
+  * e.g CNNs have 'shared weights' to take advantage of data structure.
+  * in RNNs also we apply the same Wxh for each x(t) and the same Whh to get from h(t-1) to h(t)
+  * the savings are again huge Wxh = DxM Whh = MxM Wo = MxK
+
+### Lecture 42. RNN Code Preparation
+
+* we will do the same forecasting excercise we did for Autoregressive linear model but now with a Simple RNN
+* Steps:
+* Load in the data (fix data shape for RNN: NxTxD)
+  * supervised learnign dataset
+  * sequence of length T
+  * sine wave with/without noise
+  * Linear regression expect 2D array NxT
+  * RNN expects 3D => NxTx1
+* Build the model
+  * `SimpleRNN(5, activation='relu)` layer.
+* Train the model
+  * same as AR 
+* Evaluate the model
+  * same
+* Make predictions (again be careful with shapes)
+  *  input shape will be NxTxD => output NxK (N=1,D=1,K=1 for prediction)
+  *  a single time-series input will be an 1-D array of length T 
+  *  `model.predict(x.reshape(1,T,1)[0,0]` to make it scalar as output is 2D NxK
+
+### Lecture 43. RNN for Time Series Prediction
+
+* we cp the notebook to test Simple RNN
+* first part is same with AR
+* we test first sine without noise
+* we build the dataset
+* * SimpleRNN default activation is tanh unless defined otherwise
+```
+### Build the dataset
+# lets see if we cn use T past values to predict the next value
+T = 10
+D = 1
+X = []
+Y = []
+for t in range(len(series) -T):
+  x = series[t:t+T]
+  X.append(x)
+  y = series[t+T]
+  Y.append(y)
+
+X = np.array(X).reshape(-1,T,1) # now the dat should be N x T X D
+Y = np.array(Y)
+N = len(X)
+print("X.shape",X.shape,"Y.shape",Y.shape)
+# Try the Simple RNN model
+i = Input(shape=(T,1))
+x = SimpleRNN(5)(i)
+x = Dense(1)(x)
+model = Model(i,x)
+model.compile(
+    loss="mse",
+    optimizer=Adam(lr=0.1),
+)
+
+# train the RNN
+r = model.fit(
+    X[:-N//2],Y[:-N//2],
+    epochs=80,
+    validation_data=(X[-N//2:],Y[-N//2:]),
+)
+```
+
+* loss is good
+* we do 1 step forecast like before is perfect
+* we do forecast using the RNN with default params
+
+```
+# Forecast future values (use only self-predictions for making predictions)
+
+validation_target = Y[-N//2:]
+validation_predictions = []
+
+# last train input
+last_x = X[-N//2] #!-D array of length T
+
+while len(validation_predictions) < len(validation_target):
+  p = model.predict(last_x.reshape(1,-1,1))[0,0] #1x1 array => scalar
+
+  # update the predictions list
+  validation_predictions.append(p)
+
+  # make the new input
+  last_x = np.roll(last_x,-1)
+  last_x[-1] = p
+
+plt.plot(validation_target, label='forecast target')
+plt.plot(validation_predictions, label='forecast prediction')
+plt.legend()
+```
+
+* its not perfect like AR model. RNN is mor flexible we have some shifting
+* if we set in SimpleRNN activation=None our forecast is perfect like with AR. without activation method the model reduces to a linear model
+* we add noise keeping activation=None
+* 1 step forecast but multistep one is bad.same for tanh activation
+* with relu activation is even worse in multistep forecast. loks like copying previous value
+
+### Lecture 44. Paying Attention to Shapes
 
 * 
