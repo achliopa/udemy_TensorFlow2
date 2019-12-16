@@ -1684,4 +1684,83 @@ plt.legend()
 
 ### Lecture 44. Paying Attention to Shapes
 
-* 
+* we will go through a notebook that emphasizes the importance of shapes in RNNs
+
+```
+# Things we should know and memorize
+
+# N = number of samples
+# T = sequence length
+# D = number of input features
+# M = number of hidden units (neurons)
+# K = number of output units (neurons)
+```
+
+* we make data and build the model when we see explicitly the shapes
+```
+# Make some data
+N = 1
+T = 10
+D = 3
+K = 2
+X = np.random.randn(N, T, D)
+# Make an RNN
+
+M = 5 # number of hidden units
+
+i = Input(shape=(T,D))
+x = SimpleRNN(M)(i)
+x = Dense(K)(x)
+
+model = Model(i,x)
+# Get the output
+Yhat = model.predict(X)
+print(Yhat)
+print('Yhat.shape', Yhat.shape)
+```
+
+* we use our model to make a prediction. the output is NxK (i,2)
+* we want to try to replicate the output by geting the weights
+```
+# see if we can replicate this output
+# get the weights first
+model.summary()
+# see what's returned
+model.layers[1].get_weights()
+# Check their shapes
+# Should make sense
+# First output is input > hidden
+# Second output is hidden > hidden
+# Third output is bias term (vector of length M)
+a,b,c = model.layers[1].get_weights()
+print(a.shape,b.shape,c.shape)
+```
+
+* we get `(3, 5) (5, 5) (5,)` or inout > hidden (D,M) hidden > hidden (M,M) hidden>output(M,) It makes sense
+
+```
+Wx,Wh,bh = model.layers[1].get_weights()
+Wo,bo = model.layers[2].get_weights()
+# we manualy calculate the output
+h_last = np.zeros(M) # initial hidden state
+x = X[0] # the one and only sample
+Yhats = [] # where we store the outputs
+
+for t in range(T):
+  h = np.tanh(x[t].dot(Wx)+h_last.dot(Wh)+bh)
+  y = h.dot(Wo)+bo # we only care about this value on the last iteration
+  Yhats.append(y)
+  #important: assign h to h_last
+  h_last = h
+
+#print the final output and confirm
+print(Yhats[-1])
+```
+
+* the output is the same with our prediction 
+
+### Lecture 45. GRU and LSTM (pt 1)
+
+* Modern RNN Units: 
+	* LSTM (LongShort-Term Memory)
+	* GRU (Gated Recurrent Unit)
