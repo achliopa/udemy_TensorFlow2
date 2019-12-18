@@ -1764,3 +1764,63 @@ print(Yhats[-1])
 * Modern RNN Units: 
 	* LSTM (LongShort-Term Memory)
 	* GRU (Gated Recurrent Unit)
+* GRU is like a simplified version of the LSTM (less params and more efficient)
+* Why we need them?
+  * Think of the vanishing gradients problem,
+  * The output prediction of SimpleRNN is a huge composite function,depending on x1,x2,...,xT
+* We see that derivatives (like Wxh) appears several times
+* we need to find which derivatives appear all the time in the yhat equation
+* eg we need gradient WchTxt for all inputts x1->T (all timesteps). the final gradient will be a function of all these individual derivs
+* an other parameter we need to consider is how deep nested a term is. e.g x1 is the most deeply nested of all
+* from ANNs we know that composite functions turn into multiplications in the derivative form. more nested more multiplications
+* so RNNS are very prone to the vanishing gradient problem. RNNss cant learn from inputs far back due to vanishing gradient.
+* using RELU like in ANNs does not cut it
+* in RNNs we have to use GRU and LSTM units (neurons)
+* LSTMs were created in 1997. GRUs in 2014 and is simpler and more efficient
+* Gated Recirrent Unit (GRU)
+  *  has the same IOs (API) with Simple RNN x(t),h(t-1) => GRU => h(t)
+  *  Simple RNN: ht = tanh(WxhTxt + WhhTht-1 + bh)
+  *  GRU: update gate vector zt = σ(WxzTxt + WhzTht-1 + bz)  size=M 
+  *  GRU: reset gate vector rt = σ(WxrTxt + WhrTht-1 + br)  size=M
+  *  GRU: hidden state ht = (1-zt)(o)ht-1 + zt(o)tanh(WxhTxt+WhhT(rt(o)ht-1) + bh) size=M
+  *  M is a hyperparameter (number of hidden units/feats)
+  *  shape of weights from x(t) = DxM
+  *  shape of weights from h(t) = MxM
+  *  bias is size=M
+  *  (o) is elemnt-wise multiplication x[0]y[0], x[1]y[1] etc
+  *  update gate vector : should we take the new value for h(t) or keep the old one h(t-1)? => carry on past states z(t)->0 remember z(t)->1 forget h(t-1)
+  *  it is a logistic regression (neuron). binary classification which val to choose for h(t)
+  *  reset gate vector: a neuron , a switch for remembering/foget h(t-1) but different parts of it compared to zt.
+
+### Lecture 46. GRU and LSTM (pt 2)
+
+* GRU solution to SimpleRNN vaishing gradient problem: make hidden state a weighted sum of the previous state and new state thus allowing to remember old state
+* gates are binary classifiers doing logistic regression aka neurons
+* GRUs heve less params than LSTM thus perform better.
+* Cutting edge research favors LSTMs [Paper1](https://arxiv.org/abs/1703.03906)[Paper2](https://arxiv.org/abs/1805.04908)
+* LSTM is like GRU but with more states and more gates thus more complex
+* LSTM has dfferent API than GRU or SIMPLERNN x(t),h(t-1),c(t-1)=>LSTM=>h(t),c(t)
+* it has an additional term or state c(t) or the Cell State
+* We usually ignore it like GRU intermediate vectors z,r we calculate it but dont use it
+* In TF LSTM unit is by default simplified to output only h(t) but can be configured to output c(t) as well
+* LSTM equations:
+  *   Forget gate vector (a neuron/binary classifier) : ft = σ(WxfTxt + WhfTht-1 + bf)  size=M 
+  *   Input/Update gate vector (a neuron/binary classifier) : it = σ(WxiTxt + WhiTht-1 + bi)  size=M
+  *   Output gate vector (a neuron/binary classifier) : ot = σ(WxoTxt + WhoTht-1 + bo)  size=M (controls which parts of cell state go to output)
+  *   Cell state  (weighted sum) : ct = ft(o)ct-1 + it(o)fc(WxcTxt + WhcTht-1 + bc) <- SimpleRNN term with activation function fc (usually tanh)
+  *   Hidden State  : ht = ot(o)fh(ct) <- activation function fh (usually tanh)
+  *   fc and fh are tanh by default in Tensorflow and Keras. we can change them both e.g to relu with activation argument,
+  *   to change them individually we habv eto write our own LSTM in TF but then it wont be GPU optimized
+* Options for RNN Units
+  * for each x1,x2,...,xT we will calculate h1,h2,...,hT
+  * SimpleRNN,GRU<LSTM return only hT by default
+  * we may want all of h1,h2..hT to get yhat1,yhat2,yhatT for our outut predictions
+```
+i = Input(shape=(T,)) # size NxTxM
+x = Dense(K)(x) # size NxTxK
+```
+* if we set `return_state=True` in LSTM we get cT oT and hT where oT=hT
+
+### Lecture 47. A More Challenging Sequence
+
+* 
