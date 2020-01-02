@@ -2011,3 +2011,120 @@ r = model.fit(
 ```
 
 * RNN does better, forecast matches frequency nicely
+* we replace inmodel SimpleRNN with  LSTM and rerun
+```
+# x = SimpleRNN(10)(i)
+x = LSTM(10)(i)
+```
+
+* we see that LSTMs are not so good either
+* LSTMs work better for long term dependencies
+
+### Lecture 48. Demo of the Long Distance Problem
+
+* we build the dataset
+```
+### build the dataset
+# this is a nonlinear and long-distance dataset
+# (actually, we will test long-distance vs short-istance patterns)
+
+# start with a small T and increase it later
+T = 10
+D = 1
+X = []
+Y = []
+
+def get_label(x, i1,i2,i3):
+  # x = sequence
+  if x[i1] < 0 and x[i2] < 0 and x[i3] < 0:
+    return 1
+  if x[i1] < 0 and x[i2] > 0 and x[i3] > 0:
+    return 1
+  if x[i1] > 0 and x[i2] < 0 and x[i3] > 0:
+    return 1
+  if x[i1] > 0 and x[i2] > 0 and x[i3] < 0:
+    return 1
+  return 0
+
+for t in range(5000):
+  x = np.random.randn(T)
+  X.append(x)
+  y = get_label(x, -1, -2, -3) # short distance
+  # y = get_label(x, 0, 1, 2) # short distance
+  Y.append(y)
+
+X = np.array(X)
+Y = np.array(Y)
+N = len(Y)
+```
+
+* we put a pattern that is used for classification once in the end of the sequence (RNN  does not need long term memory to remember the pattern) and once in the distant past (RNN must have long termn memory to remember it)
+* we try linear model. we expect a fail as its a nonlinear classification
+```
+# Try a linear model first - note: its a classification problem now
+i = Input(shape=(T,))
+x = Dense(1,activation='sigmoid')(i)
+model = Model(i,x)
+model.compile(
+    loss="binary_crossentropy",
+    optimize=Adam(lr=0.01),
+    metrics=['accuracy']
+)
+
+# train the model
+r = model.fit(
+    X, Y,
+    epochs=100,
+    validation_split=0.5,
+)
+```
+
+* loss and accuracy are bad
+* we try a simple RNN
+```
+### Now Try a simple RNN
+inputs = np.expand_dims(X,-1)
+
+# make the RNN
+i = Input(shape=(T,D))
+
+# method1
+x = SimpleRNN(10)(i)
+# x = LSTM(5)(i)
+# x = GRU(5)(i)
+
+# method2
+# x = LSTM(5, return_sequences=True)(i)
+# x = GlobalMaxPool1D()(x)
+x = Dense(1, activation='sigmoid')(x)
+model = Model(i,x)
+model.compile(
+    loss="binary_crossentropy",
+    # optimizer='rmsdrop',
+    # optimizer='adam',
+    optimizer=Adam(lr=0.01),
+    # optimizer=SGD(lr=0.1,momentum=0.9),
+    metrics=['accuracy'],
+)
+
+# train the model
+r = model.fit(
+    inputs, Y,
+    epochs=200,
+    validation_split=0.5,
+)
+```
+
+* RNN solves the problem well as the feature is not in distant past
+* we make the dataset such as its a long distanc eproblem
+* SimpleRNN can not solve it as we have a vanishing gradient problem
+* we replace SimpleRNN layer with LSTM and train again. now we see good results
+* we increase sequence length from 10 to 20 and rerun. LSTM solves it with 200 epochs but its getting difficult
+* we try GRU instead of LSTM for 400 epochs. GRU has problem
+* we set sequence length T=30 and try LSTM. it cannot cut it now to find a pattern 30 steps in the past
+* we try a different approach with LSTM and Max Pooling
+* we try `x = LSTM(5, return_sequences=True)(i)` which for input TxD returns TxM as it returns all hidden states. h1 to hT. 
+* so we need max pooling to get back to size M `max{h(1)...h(T)}`
+* simple LSTM with Return Sequences False returns size M as it returns only h(T)
+* `GlobalMaxPooling2D` goes from HxWxC to C
+* `GlobalMaxPooling1D` goes from TxM to M
