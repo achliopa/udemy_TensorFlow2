@@ -2038,4 +2038,281 @@ plt.title('RNN forecast')
 plt.legend()
 ```
 
+### Lecture 48. Demo of the Long Distance Problem
+
+* we will try LSTM with `return_sequences=True` to return the intermediate hidden states
+```
+### Now try LSTM with Global Max pooling
+inputs = np.expand_dims(X,-1)
+
+# make the RNN
+i = Input(shape=(T,D))
+
+# method2
+x = LSTM(5, return_sequences=True)(i)
+x = GlobalMaxPool1D()(x)
+x = Dense(1, activation='sigmoid')(x)
+model = Model(i,x)
+model.compile(
+    loss="binary_crossentropy",
+    # optimizer='rmsdrop',
+    # optimizer='adam',
+    optimizer=Adam(lr=0.01),
+    # optimizer=SGD(lr=0.1,momentum=0.9),
+    metrics=['accuracy'],
+)
+
+# train the model
+r = model.fit(
+    inputs, Y,
+    epochs=100,
+    validation_split=0.5,
+)
+```
+* it improves results a lot
+* return_sequence=False
+  * After RNN unit h(T):M
+  * Output: K
+* return)sequence=True
+  * Input: TxD
+  * After RNN Unit h(1),h(2)...h(T): TxM
+  * After global max pooling max{h(1),h(2)...h(T)}:M
+  * Output: K
+* For Images we use GlobalMaxPooling2D: input: HxWxC => output: C
+* For sequences we use GlobalmaxPooling1D: input: TxM => output: M
+* To extend our Exercise we can spread out the relevant points 'pattenrs'
+* this simulates language; we cant parse the meaning of a sentence without considering the reationships between words whih are far apart
+* Also adding GlobalmaxPooling to SimpleRNN or GRU
+* Stacking RNN layers
+*   * the input into a 2nd LSTM unit will be h(1),h(2)...h(T) from the first LSTM unit like x(1),x(2)...x(T) are inputs to first LSTM
+
+### Lecture 49. RNN for Image Classification (Theory
+
+* We take a dumb approach considering tabular data (survey answers)
+* these feats made up the input feature vector
+* for images we flattended the pixels making it a feature vector.
+* we pretend each pixel is the answer to a survey question
+* for time series we pretend each value in teh sequence is the answer to a survey question
+* a multidimensional times series is a TxD matrix (each column is a time series)
+* consider a black and white image MNIST, fashionMNIST. its a HxW matrix (2-D). as it is also 2D we can pretend the image is a time series
+* RNN can be perceived as an image scanner, it looks at the image each row at the time
+* CODE prep
+  * load in the data (MNIST): X is of size NxTxD (T=D=28)
+  * instantiate the model: LSTM=> Dense (10,activation='softmax')
+  * fit/plot the loss
+
+### Lecture 50. RNN for Image Classification (Code)
+
+```
+# Load in the data
+mnist = tf.keras.datasets.mnist
+
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0
+print("x_train.shape:",x_train.shape)
+# Build the model
+
+i = Input(shape=x_train[0].shape)
+x = LSTM(128)(i)
+x = Dense(10,activation='softmax')(x)
+
+model = Model(i,x)
+# compile and train
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+r = model.fit(x_train, y_train, validation_data=(x_test,y_test),epochs=10)
+```
+
+* it works ok as it captures long distance relationships.
+* its long distance as patterns (feats) can apear anywhere in the image (sequence of pixels)
+
+### Lecture 51. Stock Return Predictions using LSTMs (pt 1)
+
+* many people claim to predict stock prices using LSTMs
+* wrong claims can spread in the internet
+* we load 5 year Starbux stockprices in a dataframe, transform ans scale the data for RNN and use LSTMs
+```
+# we load inb CSV with SBUX stockprices from 2013-2018
+df = pd.read_csv('https://raw.githubusercontent.com/lazyprogrammer/machine_learning_examples/master/tf2.0/sbux.csv')
+# Start by doing the wrong thing - trying to predict the price itself
+series = df['close'].values.reshape(-1,1)
+# Normalize the data
+# The boundary is just an approximation
+scaler = StandardScaler()
+scaler.fit(series[:len(series) // 2])
+series = scaler.transform(series).flatten()
+### Build the dataset
+# let's see if we can use T past values to predict the next value
+T = 10
+D = 1
+X = []
+Y = []
+for t in range(len(series) - T):
+  x = series[t:t+T]
+  X.append(x)
+  y = series[t+T]
+  Y.append(y)
+
+X = np.array(X).reshape(-1,T,1) # Now the data should be NxTxD
+Y = np.array(Y)
+N = len(X)
+print("X.shape",X.shape,"Y.shape",Y.shape)
+### Try Autoregressive RNN model
+i = Input(shape=(T,1))
+x = LSTM(5)(i)
+x = Dense(1)(x)
+model = Model(i,x)
+model.compile(
+    loss='mse',
+    optimizer=Adam(lr=0.1),
+)
+
+# train the RNN
+r = model.fit(
+    X[:-N//2], Y[:-N//2],
+    epochs=80,
+    validation_data=(X[-N//2:],Y[-N//2:]),
+)
+# One-step forecast using true targets
+outputs = model.predict(X)
+print(outputs.shape)
+predictions = outputs[:,0]
+
+plt.plot(Y, label='targets')
+plt.plot(predictions, label='predictions')
+plt.legend()
+```
+
+* one step forecasting seems unrealistically good
+* we try multi-step forecasting
+```
+# Forecast future values (use only self-predictions for making predictions)
+
+validation_target = Y[-N//2:]
+validation_predictions = []
+
+# last train input
+last_x = X[-N//2] #!-D array of length T
+
+while len(validation_predictions) < len(validation_target):
+  p = model.predict(last_x.reshape(1,T, 1))[0,0] #1x1 array => scalar
+
+  # update the predictions list
+  validation_predictions.append(p)
+
+  # make the new input
+  last_x = np.roll(last_x,-1)
+  last_x[-1] = p
+
+plt.plot(validation_target, label='forecast target')
+plt.plot(validation_predictions, label='forecast prediction')
+plt.legend()
+```
+
+* it fails BADLY. so in one step forecasting its just copying previous value
+* time series like images are neighbor correlated data
+
+### Lecture 52. Stock Return Predictions using LSTMs (pt 2)
+
+* one step prediction on stock prices is misleading and unconventional
+* what is more conventional is the stock return (net profit/loss) for a given time (say day or week)
+* R = (Vfinal - Vinitial)/Vinitial
+```
+# calculate returns by first shifting the data
+df['PrevClose'] = df['close'].shift(1) # move everything up 1
+
+# so now its like
+# close  / prev. close
+# x[2] x[1]
+# x[3] x[2]
+# x[4] x[3]
+# ...
+# x[t] x[t-1]
+# the the return is
+# x[t] -x[t-1] / x[t-1]
+df['Return'] = (df['close'] - df['PrevClose']) / df['PrevClose']
+# we check distribution of vals
+df['Return'].hist()
+# they are concentrated so we need to normalize them
+series = df['Return'].values[1:].reshape(-1,1)
+# normalize the data
+# note: I didn't think about where the true boundary is, this is just aprox
+scaler = StandardScaler()
+scaler.fit(series[:len(series) // 2])
+scaler = scaler.transform(series).flatten()
+```
+
+* we follow same steps as before to prove that the model cannot do much execpt one step prediction.
+
+### Lecture 53. Stock Return Predictions using LSTMs (pt 3)
+
+* we will use all data: open,close,high,low,volume (D=5)
+* we ll try to predict if the price will go up or down (binary classification)
+* regression is harder than classification
+```
+# Now turn the full data into numpy arrays
+
+# Not ye in the final 'X' format
+input_data = df[['open','high','low','close','volume']].values
+targets = df['Return'].values
+# Now make the actual data which will go into the neural network
+T = 10 # the number of time steps to look at to make a prediction for the next day
+D = input_data.shape[1]
+N = len(input_data) - T # (e.g if T=10 and ou have 11 data pointsthen we only have 1)
+# Normalize the inputs
+Ntrain = len(input_data) * 2 // 3
+scaler = StandardScaler()
+scaler.fit(input_data[:Ntrain+T])
+input_data = scaler.transform(input_data)
+# Setup X_train and y_train
+
+X_train = np.zeros((Ntrain, T, D))
+y_train = np.zeros(Ntrain)
+
+for t in range(Ntrain):
+  X_train[t,:,:] = input_data[t:t+T]
+  y_train[t] =(targets[t+T]>0)
+# Setup X_test and y_test
+X_test = np.zeros((N-Ntrain, T, D))
+y_test = np.zeros(N-Ntrain)
+
+for u in range(N-Ntrain):
+  # u counts from 0...(N - Ntrain)
+  # t counts from Ntrain...N
+  t = u + Ntrain
+  X_test[u,:,:] = input_data[t:t+T]
+  y_test[u] = (targets[t+T] > 0)
+# Make the RNN
+i = Input(shape=(T,D))
+x = LSTM(50)(i)
+x = Dense(1,activation='sigmoid')(x)
+model = Model(i,x)
+model.compile(
+    loss='binary_crossentropy',
+    optimizer=Adam(lr=0.001),
+    metrics=['accuracy'],
+)
+# train the RNN
+r = model.fit(
+    X_train, y_train,
+    batch_size=32,
+    epochs=300,
+    validation_data=(X_test,y_test),
+)
+```
+
+* model is overfitting on noise
+* accuracy is no better than random guessing
+* one step prediction of stock price seems accurate
+* one step prediction of stock return is more realistic but less accurate\
+* 5 cols for binary classification is terrible
+* trying to predict stock prices from stock prices is flawed
+* stock prices is result of occurence in real world
+* stock depends on investors emotions. how the company appears in media, nw investors etc
+
+## Section 7: Natural Language Processing (NLP)
+
+### Lecture 54. Embeddings
+
 * 
