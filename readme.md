@@ -2430,4 +2430,121 @@ r = model.fit(
 
 ### Lecture 54. Embeddings
 
-* 
+* we used RNNs for models on sequence data
+* text is also sequence data but not continuous. they are categorical objects
+* we cannot use SImpleRNNs because text entries are not numerical
+* if we try to hot encode words using an array the size of the vocabulary (V) we end up with a hugely sparce vector for each word
+* if we have a sequence of T words which get one-hot encoded in size V vectors. the sentence becomes TxV matrix
+* V can be as big as 1million. 
+* This creates a problem as to do classification we look for structures in input features aka clustering
+* Embeddings is a better solution.
+  * assign each word to a D-dimensional vector (not hot encoded)
+* One hot endoding an integer k and multiplying that by a matrix is the same as selecting the k row of the matrix
+* if  we index the weight table directly selecting the kth row: W[k] is much more efficient
+* the Embedding Layer:
+  * Step1: convert words into integers (index): `['i','like','cats'] => [50,25,3]`
+  * Step2: use integers to index the word embedding matrix to get word vectors for each wordmining `[50,25,3]=>[[0.3,-0.5],[1.2,0.7],[-2.1,0.9]]` Tlength array -> TxD matrix
+* Tensorflow Embedding
+  * Convert sentences into sequences of word indexes `['i','like','cats'] => [50,25,3]` unique integers lik in classification
+  * Embedding layer maps sequence of integers into sequence of word vectors `['i','like','cats'] => [50,25,3]` Tlength array -> TxD matrix
+* How we find weights? 
+  * we know that the word vectors must have some structure. words are clustering by meaning in dimensional space
+  * like in CNNs the weights are found automatically when we call model.fit()
+  * sometimes we use pretrained word vectors (trained with some other algorithm) 
+  * we freeze the embedding layer weights so noly other layers are trained with fit. 
+  * and build a model like: Input => Embedding(fixed) => LSTM => Dense => Output
+  * read about word2vec and CloVe to learn more
+
+### Lecture 55. Code Preparation (NLP)
+
+* we know how to build BBs that accept numerical input
+* we will see how to turn a seq of words into an acceptable format to convert into a TxD matrix
+* before building word vectors we must convert words to integers (indexes to word embedding matrix)
+* we need a mapping
+```
+dataset = long sequence of words
+current_idx = 1
+word2idx = {}
+for word in dataset:
+  if word not in word2idx:
+    word2idx[word] = current_idx
+    current_idx += 1
+```
+* we start indexing from 1 not 0. in TF we have constant seq length so all our data fits in NxTxD array
+* T is the max seq length so sorter sentences need padding
+* 0 is used for padding so 0 is not acceptable as index
+* TF does words to index automatically
+* we want list  of strings containing words (tokenization)
+* Tensorflow Tokenizer
+  * For a Google size dataset we mwy have 1 million tokens, most of which are extremely rare and useless
+  * we can assign these to generic <RARE> or <UNKNOWN> token using fit_on_text
+```
+MAX_VOCAB_SIZE = 2
+tokenizer = Tokenizer(num_words=MAX_VOCAB_SIZE)
+tokenizer.fit_on_texts(sentences)
+sequences = tokenizer.texts_to_sequences(sentences)
+```
+
+ * sequences stil need padding as they have different length
+```
+max_size = max(len(seq) for seq in sequnces)
+for i in range(len(sequences)):
+  sequences[i] = sequences[i] + [0]*(max_size - len(sequences[i]))
+```
+
+* TF does it automaticaly `data = pad_sequences(sequences, maxlen=MAXLEN)`
+* Input: A list if N lists of integers (max lenght is T)
+* Output: An NxT matrix (Or an NxMAXLEN matrix depending on which is smaller)
+* If we truncate a sentence, will it truncate at beginning or end?
+* we can control this by setting `truncating` arg to `pre` or `post`
+```
+data = pad_sequences(
+  sequences,
+  maxlen=MAXLEN,
+  truncating="pre"
+)
+```
+* we can control where padding goes also. this is useful as we usually want padding at beginning. RNNs have trouble to learn patterns in distance past 
+```
+data = pad_sequences(
+  sequences,
+  maxlen=MAXLEN,
+  padding="pre"
+)
+```
+* in translations target language might end with larger sentence than input. post padding is better then
+* N = # samples , T = sequence length, X[n,t] is the word appearing in  document n, timestep t
+* the NxT matrix of word indices is passed to Embedding Layer to get a NxTxD tensor, it converts each word to a word vector
+```
+i = Input(shape=(T,))
+x = Embedding(V,D)(i) # x is now NxTxD
+...rest of RNN...
+```
+
+### Lecture 56. Text Preprocessing
+
+* we build a notebook
+```
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+# Just a simple test
+sentences = [
+  "I like eggs and ham.",
+  "I love chocolate and bunnies.",
+  "I hate onions."
+]
+MAX_VOCAB_SIZE = 20000
+tokenizer = Tokenizer(num_words=MAX_VOCAB_SIZE)
+tokenizer.fit_on_texts(sentences)
+sequences = tokenizer.texts_to_sequences(sentences)
+# How to get the word to index mapping?
+tokenizer.word_index
+# use the defaults
+data = pad_sequences(sequences)
+print(data)
+# customize padding
+data = pad_sequences(sequences,maxlen=MAX_SEQUENCE_LENGTH,padding="post")
+print(data)
+```
+
+### Lecture 57. Text Classification with LSTMs
