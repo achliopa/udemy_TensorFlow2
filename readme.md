@@ -2548,3 +2548,142 @@ print(data)
 ```
 
 ### Lecture 57. Text Classification with LSTMs
+
+* we will do spam detection in a notebook
+```
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.layers import Dense, Input, GlobalMaxPooling1D
+from tensorflow.keras.layers import LSTM, Embedding
+from tensorflow.keras.models import Model
+# unfortunately this URL doesn't work with pd.read_csv
+!wget https://lazyprogrammer.me/course_files/spam.csv
+# read with pandas using correct encoding
+df = pd.read_csv('spam.csv',encoding='ISO-8859-1')
+# drop unnecessary columns
+df = df.drop(["Unnamed: 2","Unnamed: 3","Unnamed: 4"], axis=1)
+# rename columns to sthing better
+df.columns = ['labels','data']
+# create binary labels
+df['b_labels'] = df['labels'].map({'ham': 0, 'spam': 1})
+Y = df['b_labels'].values
+# split up the data
+df_train,df_test,Ytrain,Ytest = train_test_split(df['data'], Y, test_size=0.33)
+# convert sentences to sequences
+MAX_VOCAB_SIZE=20000
+tokenizer = Tokenizer(num_words=MAX_VOCAB_SIZE)
+tokenizer.fit_on_texts(df_train)
+sequences_train = tokenizer.texts_to_sequences(df_train)
+sequences_test = tokenizer.texts_to_sequences(df_test)
+# get word -> integer mapping
+word2idx = tokenizer.word_index
+V = len(word2idx)
+print('Found %s unique tokens.' % V)
+# pad sequences so that we get a N x T matrix
+data_train = pad_sequences(sequences_train)
+print('Shape of data train tensor:',data_train.shape)
+# get sequence length
+T = data_train.shape[1]
+data_test = pad_sequences(sequences_test,maxlen=T)
+print('Shape of data test tensor:',data_test.shape)
+# create the model
+
+# We get to choose embeding dimensionality
+D = 20
+
+# Hidden stats dimensionality
+M = 15
+
+# Note: we actually want to the size of the embedding to (V+1) x D.
+# because the first index starts from 1 and not 0.
+# Thus, if the final index of the embedding matrix is V,
+# then it actually must have size V+1.
+
+i = Input(shape=(T,))
+x = Embedding(V+1,D)(i)
+x = LSTM(M,return_sequences=True)(x)
+x = GlobalMaxPooling1D()(x)
+x = Dense(1, activation='sigmoid')(x)
+
+model = Model(i,x)
+# Compile and fit
+model.compile(
+    loss='binary_crossentropy',
+    optimizer='adam',
+    metrics=['accuracy']
+)
+print('Training model....')
+r=model.fit(
+    data_train,
+    Ytrain,
+    epochs=10,
+    validation_data=(data_test,Ytest)
+)
+```
+
+* it converges fast with good accuracy
+
+### Lecture 58. CNNs for Text
+
+* CNNs work with sequences as well
+* convolution is about multiplying and adding
+* images have 2D and have correlations
+* Sequences has 1 feature dimension. time
+* Same type of correlation appears in images and sequences. nearby data are correlated
+* 1D convolution is simpler than 2D convolution.slide filter along sequence. multiply and add. its called cross-correlation x(t)*w(t)=Σ[τ]x(t+τ)w(τ),τ=1..len(w)
+* 1D Convolution with multiple Feature seq. 
+  * Input is TxD (T=#of time steps, D = # of input feaures) 
+  * Output is TxM (M=# of output features)
+  * Then W (the filter) has the shape TxDxM
+  * y(t,m)=Σ[τ]Σ[d=1->D]x(t+τ,d)w(τ,d,m)
+* For images we have: 2 spatial dimensions, 1 input feature dimension, 1 output feaure dimension = 4 
+* For sequences we have: q1 time dimension, 1 input feat di, 1 output feat dim=3
+* Convolution is matrix mult with shared weights. a pattern matcher
+* Convolution on Text:
+  * we use embeddings to give us what we need
+  * for 1D convolution we need TxD input
+  * thats what we get when we use embedding on a seq of words with length T
+  * the word vectros are of length D
+* In Text CNNs the data shrinks in time dimension but grown in feature dimension(more featue maps)
+
+### Lecture 59. Text Classification with CNNs
+
+* we build a noteboo for text classification with CNNs
+* only the model is different than before
+```
+from tensorflow.keras.layers import Conv1D,MaxPooling1D, Embedding
+# create the model
+
+# We get to choose embeding dimensionality
+D = 20
+
+# Note: we actually want to the size of the embedding to (V+1) x D.
+# because the first index starts from 1 and not 0.
+# Thus, if the final index of the embedding matrix is V,
+# then it actually must have size V+1.
+
+i = Input(shape=(T,))
+x = Embedding(V+1,D)(i)
+x = Conv1D(32, 3, activation='relu')(x)
+x = MaxPooling1D(3)(x)
+x = Conv1D(64, 3, activation='relu')(x)
+x = MaxPooling1D(3)(x)
+x = Conv1D(128, 3, activation='relu')(x)
+x = GlobalMaxPooling1D()(x)
+x = Dense(1, activation='sigmoid')(x)
+
+model = Model(i,x)
+```
+
+* we train for 5 epochs now. it converes faster than RNN with better results
+
+## Section 8: Recommender Systems
+
+### Lecture 60. Recommender Systems with Deep Learning Theory
+
+* 
