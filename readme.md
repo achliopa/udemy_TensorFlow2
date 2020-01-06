@@ -3158,5 +3158,29 @@ print(logr.score(X_valid2,Y_valid))
 
 * Then we do LogReg in TF
 ```
+# Do logistic regression in Tensorflow
 
+i = Input(shape=(D,))
+x = Dense(1,activation='sigmoid')(i)
+linearmodel = Model(i,x)
+linearmodel.compile(
+    loss='binary_crossentropy',
+    optimizer='adam',
+    merics=['accuracy']
+)
+# Can try both normalized and unnormalized data
+r = linearmodel.fit(
+    X_train, Y_train,
+    batch_size=128,
+    epochs=10,
+    validation_data=(X_valid,Y_valid),
+)
 ```
+
+* this approach is faster and gives even better results than with data augmentation with fast convergence
+
+## Section 10: GANs (Generative Adversarial Networks)
+
+### Lecture 68. GAN Theory
+
+* 
