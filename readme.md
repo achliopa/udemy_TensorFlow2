@@ -2686,4 +2686,477 @@ model = Model(i,x)
 
 ### Lecture 60. Recommender Systems with Deep Learning Theory
 
-* 
+* recommender systems is the most applicable concept in ML
+* used in any consumer-facing business. 
+* we encounter them all the time (Youtube,Spotify,Netflix,Amazon,Fb,Google)
+* pages in google is built with recommendations 
+* even news do it to increase conversion rate...
+* We will focus on Ratings Recommenders. it works with data that come in the form of triples (user,item,rating) e.g. (Alice,Avatar,5)
+* Ratings Dataset must be incoplete... it cant be that a user will rate all movies e.g
+* How it works???
+  * Given a dataset of triples: (user,item,rating)
+  * Fit a model to the data; F(u,i)->r
+  * If the user u and item i appeared in the dataset, then the predicted rating shold be close to the true rating
+  * the function should predict the rating of a user to  an item even if it didn;t appear in the training set
+  * NNs (function approximators) do this.
+* The recommendation comes from the ability of our model to predict ratings for unknown items.
+* For a given user, get predictions for every item. 
+* then sort them by predicted rating in descending order
+* present as recommendations the items with highest predicted rating
+* To build the model:
+  * both users and items are categorical data (problem)
+  * NNs work with matrices. we cannot multiply a category with a number
+  * We resort to NLP for insipration
+  * we use embeddings to map a category to a feature vector
+* IN Recommender systems we get 2 vectors: 1 for user and 1 for item.
+* we concat them to 1 and pass them to NN
+* In Recommender systems we can use simple NNs as it is a regression task to predict ratings. not a classification one.
+* psudomodel
+```
+u = input(shape=(1,))
+m = input(shape=(1,)) # think in terms of NLP, seq len = T
+
+# convert u and m to feature vectors
+u_emb = Embedding(num_users,embedding_dim)(u)
+m_emb = Embedding(num_movies,embedding_dim)(m)
+
+# make it a single feature vector
+x = Xoncat()(u_emb,m_emb)
+
+# ANN
+x = Dense(512,aciation='relu')(x)
+x = Dense(1)(x)
+```
+* in this model TF Functional API is required
+* 2 inputs appear in parallel
+* seq layer dont support this
+* NLP is the insiration on Recommender systems. Also Recommender systems also inspire NLP. 
+* Matrix Factorization is a wll known algo in Recommenders. when word embeddings became popular, word2vec and Glove where the main algos to find word embeddings, bo th find word relations as vectors lie "king - man" = "gueen - woman"
+* Glove is matrix factorization
+
+### Lecture 61. Recommender Systems with Deep Learning Code
+
+* We build a Recommender in Notebook
+```
+# More imports
+from tensorflow.keras.layers import Input,Dense,Embedding,Flatten, Concatenate
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import SGD, Adam
+from sklearn.utils import shuffle
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+# data is from: https://grouplens.org/datasets/movielens
+# in case the link changes in the future
+!wget -nc http://files.grouplens.org/datasets/movielens/ml-20m.zip
+!unzip -n ml-20m.zip
+df = pd.read_csv('ml-20m/ratings.csv')
+df.head()
+# we cant trust the userId and movieId to be numbered 0...N-1
+# lets just set our own ids
+df.userId = pd.Categorical(df.userId)
+df['new_user_id'] = df.userId.cat.codes
+# df['new_user_id'] = df.apply(map_user_id,axis=1)
+df.userId = pd.Categorical(df.userId)
+df['new_user_id'] = df.userId.cat.codes
+# Get user IDs, movie IDs, and ratings as separate arrays
+user_ids = df['new_user_id'].values
+movie_ids = df['new_movie_id'].values
+ratings = df['rating'].values
+# Get number of users and number of movies
+N = len(set(user_ids))
+M = len(set(movie_ids))
+# Get embedding dimension
+K = 10
+# Make a neural network
+# User Input
+u = Input(shape=(1,))
+# Movie input
+m = Input(shape=(1,))
+# User embedding
+u_emb = Embedding(N,K)(u) # output is (num_samples,1,K)
+# Movie embedding
+m_emb = Embedding(M,K)(m) # output is (num_samples,1,K)
+# Flatten both embeddings
+u_emb = Flatten()(u_emb) # now its (num_samples, K)
+m_emb = Flatten()(m_emb) # now its (num_samples, K)
+# Concatenate user-movie embeddings into a feature vector
+x = Concatenate()([u_emb,m_emb]) # now its (num_samples, 2K)
+# Now that we have a feature vector, its just a regular ANN
+x = Dense(1024, activation='relu')(x)
+# x = Dense(400, activation='relu')(x)
+# x = Dense(400, activation='relu')(x)
+x = Dense(1)(x)
+# Build the model and compile
+model = Model(inputs=[u,m],outputs=x)
+model.compile(
+    loss='mse',
+    optimizer=SGD(lr=0.08,momentum=0.9),
+)
+# split the data
+user_ids,movie_ids,ratings = shuffle(user_ids,movie_ids,ratings)
+Ntrain = int(0.8 * len(ratings))
+train_user = user_ids[:Ntrain]
+train_movie = movie_ids[:Ntrain]
+train_ratings = ratings[:Ntrain]
+
+test_user = user_ids[Ntrain:]
+test_movie = movie_ids[Ntrain:]
+test_ratings = ratings[Ntrain:]
+
+# center the ratings
+avg_rating = train_ratings.mean()
+train_ratings = train_ratings - avg_rating
+test_ratings = test_ratings - avg_rating
+r = model.fit(
+    x=[train_user,train_movie],
+    y=train_ratings,
+    epochs=25,
+    batch_size=1024,
+    verbose=2, #goes faster when you dont print the progrss bar
+    validation_data=([test_user,test_movie], test_ratings),
+)
+```
+
+ * loss is not very good but is ok compared to other resources
+
+## Section 9: Transfer Learning for Computer Vision
+
+### Lecture 62. Transfer Learning Theory
+
+* A very important topic in modern deep learning
+* with Transfer learning we get:
+  * higher start
+  * higher slope
+  * higher asymptote
+* so better results in convergence overall
+* Features are hierarchical and related, geting progressively more complex
+* e.g CNNs start with simple lines and strokes common for many feats
+* Features we find from one task may be used for another task. this is the concept of Transfer learning. mainly used in CV
+* ImageNet is a large scale image dataset. 1m images 1k categories. because dataset is diverse, weights from this dataset can be used in many vision tasks
+* even for new never seen images (microscope)
+* Its not feasible for us to train on Imagenet, too costly
+* Major CNNs tha won ImagNet contest come pretrained
+* Pretrained models are already included in Tensorflow
+* A 2-part CNN: feature trandformer part "body" and the ANN classifier "head"
+* With transfer learning we keep the "body" and replace the "head"
+* Head can be logistic regression or ANN. carsvstrucks can use logistic regression with sigmoid
+* To do that we retrain a pretrained model, freezng the "body" layers and train only the "head"
+* Advantage of transfer learning is tha we dont need a lot of data to build a state of the art model. we just need relevant data
+
+### Lecture 63. Some Pre-trained Models (VGG, ResNet, Inception, MobileNet)
+
+* VGG
+  * named after a research group that created it. visual geometry group
+  * like normal CNN but bigger
+  * VGG16, VGG9 options (9 or 16 layers)
+* ResNET
+  * a CNN with branches(one branch is the identity function, the other learns the reidual)
+  * Variations: ResNet50,ResNet101,ResNet152,ResNet_v2,ResNext
+* Inception
+  * Multiple convolutions in parallel branches
+  * Instead of trying to choose different filter size (1x1,3x3,5x5 etc) try them all
+* MobileNet
+  * lightweight: tradeoff between speed and accuracy
+  * used in less powerful machines (mobile,embedded)
+* Preprocessing wehen using pretrained CNNs
+  * our data must be formated like original train set of pretrained moel
+  * we usualy work with RGB vals of [0.1] or [-1,1]
+  * VGG uses BGR with pixel values centered nit scaled
+  * just import `preprocess_input` from the sma module as the model
+```
+from keras.applications.resnet50 import ResNet50,preprocess_input
+from kears.preprocessing import image
+from keras.preprocessing.image import ImageDataGenerator
+```
+
+### Lecture 64. Large Datasets and Data Generators
+
+* For learning DL, MNIST,CIFAR-10,SVHN are ok and also come as numpy arrays or csv
+* In real world images come as imag files (JPEG,PNG ...)
+* Images are also larger.
+* VGG and ResNet are trained on ImageNet images resized to 224x224. so a hefty 150GB. this does not fit on RAM
+* we use batching
+* we assume 2 arrays. 1 for filenames, 1 for actual image as tables
+* we assume batch size of 32
+```
+for i in range(n_batches):
+  x = load_images(filenames[i:i+32])
+  y = labels[i:i+32]
+  model.train_on_batch(x,y)
+```
+* `gen = ImageDataGenerator()` automatically generates data in batches, does data augmentation, accepts preprocessing methods like from `preprocess_input`
+* `generator = gen.flow_from_directory()` where we specify the target image size
+* `model.fit_generator(generator)` is used instead of .fit
+* use of genrators dictates a specific folder structure
+
+### Lecture 65. 2 Approaches to Transfer Learning
+
+* We go through 2 approaches for Transfer learning
+* if we have a 100 layer bosy and 1 layer head, even if we freeze body weights, it takes time to compute the output prediction
+* 2 part Computation
+  * Part1: z=f(x) # pretrained CNN - slow
+  * Part2: y_hat = softmax(Wx+b) # logistic regression - fast
+```
+for epoch in epochs:
+  shuffle(batches)
+  for x,y in batches:
+    z = vgg_body(x)
+    y_hat = softmax(z.dot(x) + b)
+    gw = grad(error(y,y_hat),w)
+    gb = grad(error(y,y_hat),b)
+    # update w and b using gw and gb
+``` 
+* we take `z = vgg_body(x)` out of the loop
+* before training we convert all input data into tabular matrix of feature vectors (Z)
+* then we just have to run log reg on Z
+* the problem is data augmentation that we get from generator works in iterations
+* 1st approach: use data augmentation with `ImageDataGenerator` where entire CNN computation must be in the loop (slow)
+  * Pros: possbly better for generalization
+  * Cons: slow (input must pass from CNN)
+* 2nd approach: precompute Z without data augmentation, only need to train log reg on (Z,Y) (fast)
+  * Pros: data must pass only from 1 layer
+  * Cons: possibly worse generalization
+
+### Lecture 66. Transfer Learning Code (pt 1)
+
+* we see 1st approach with a notebook example
+```
+# More imports
+from tensorflow.keras.layers import Input,Dense,Flatten
+from tensorflow.keras.applications.vgg16 import VGG16 as PretrainedModel, preprocess_input
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import SGD,Adam
+from tensorflow.keras.preprocessing import image
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+from glob import glob
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import sys, os
+# Data from https://mmspg.epfl.ch/downloads/food-image-datasets/
+!wget -nc https://lazyprogrammer.me/course_files/Food-5K.zip
+!unzip  -qq -o Food-5K.zip
+!ls Food-5K/training
+# look at an image for fun
+plt.imshow(image.load_img('Food-5K/training/0_808.jpg'))
+plt.show()
+# Food images start with 1, non-foo images start with 0
+plt.imshow(image.load_img('Food-5K/training/1_616.jpg'))
+plt.show()
+```
+
+* we reorganize and prepare data for CNN
+```
+!mkdir data
+# make diectories to store the data Keras-style
+!mkdir data/train
+!mkdir data/test
+!mkdir data/train/nonfood
+!mkdir data/train/food
+!mkdir data/test/nonfood
+!mkdir data/test/food
+# Move the images
+# Note: we will consider 'training' to be train set
+# 'validation' folder will be the test set
+# ignore the 'evaluation' set
+!mv Food-5K/training/0*.jpg data/train/nonfood/
+!mv Food-5K/training/1*.jpg data/train/food/
+!mv Food-5K/validation/0*.jpg data/test/nonfood/
+!mv Food-5K/validation/1*.jpg data/test/food/
+train_path = 'data/train'
+valid_path = 'data/test'
+# These images are pretty big andof different sizes
+# Let's load them all in as the same (smaller) size
+IMAGE_SIZE = [200,200]
+# useful for getting number of files
+image_files = glob(train_path + '/*/*.jpg')
+valid_image_files = glob(valid_path + '/*/*.jpg')
+# useful for getting number of classes
+folders = glob(train_path + '/*')
+folders
+# look at an image for fun
+plt.imshow(image.load_img(np.random.choice(image_files)))
+plt.show()
+```
+
+* we work with the pretrained model
+```
+ptm = PretrainedModel(
+    input_shape=IMAGE_SIZE + [3],
+    weights = 'imagenet',
+    include_top = False)
+# freeze pretrained model weights
+ptm.trainable = False
+# map the data into feature vectors
+# Keras image data generator returns classes one-hot encoded
+K = len(folders) # number of classes
+x = Flatten()(ptm.output)
+x = Dense(K,activation='softmax')(x) #softmax is more generic it can work with multiclass classification
+```
+
+* we create and train the model using a generator
+```
+# create a model object
+model = Model(inputs=ptm.input,outputs=x)
+# view the structure of the model
+model.summary()
+# create an instance of ImageDataGenerator
+gen = ImageDataGenerator(
+    rotation_range=20,
+    width_shift_range =0.1,
+    height_shift_range=0.1,
+    shear_range=0.1,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    preprocessing_function=preprocess_input
+)
+batch_size = 128
+
+# create generators
+train_generator = gen.flow_from_directory(
+    train_path,
+    shuffle=True,
+    target_size=IMAGE_SIZE,
+    batch_size=batch_size,
+)
+valid_generator = gen.flow_from_directory(
+    valid_path,
+    target_size=IMAGE_SIZE,
+    batch_size=batch_size,
+)
+model.compile(
+    loss='categorical_crossentropy',
+    optimizer='adam',
+    metrics=['accuracy']
+)
+# fit the model
+r = model.fit_generator(
+    train_generator,
+    validation_data=valid_generator,
+    epochs=10,
+    steps_per_epoch=int(np.ceil(len(image_files)/batch_size)),
+    validation_steps=int(np.ceil(len(valid_image_files)/batch_size)),
+)
+```
+
+* results are good
+
+### Lecture 67. Transfer Learning Code (pt 2)
+
+* we try 2nd approach without generators on a notebook
+* preparing of data is the same like before
+* the code difers when we start with the pretrained model
+* in this approach we dont hot encode targets
+```
+ptm = PretrainedModel(
+    input_shape=IMAGE_SIZE + [3],
+    weights='imagenet',
+    include_top=False)
+# map the data into feaure vectors
+x = Flatten()(ptm.output)
+# create a model object
+model = Model(inputs=ptm.input,outputs=x)
+# view the structure of the model
+model.summary()
+# create an instance of ImageDataGenerator
+gen = ImageDataGenerator(preprocessing_function=preprocess_input)
+batch_size = 128
+
+# create generators
+train_generator = gen.flow_from_directory(
+  train_path,
+  target_size=IMAGE_SIZE,
+  batch_size=batch_size,
+  class_mode='binary',
+)
+valid_generator = gen.flow_from_directory(
+  valid_path,
+  target_size=IMAGE_SIZE,
+  batch_size=batch_size,
+  class_mode='binary',
+)
+```
+
+* we create our dataset
+* we make empty datasets and then actual data passing them from the pretrained odel in batches
+* generator is infinite loop. we need to brake manualy
+```
+Ntrain = len(image_files)
+Nvalid = len(valid_image_files)
+
+# Figure out the output size using model predict on random data
+feat = model.predict(np.random.random([1] + IMAGE_SIZE + [3]))
+D = feat.shape[1]# populate X_train and Y_train
+i = 0
+for x,y in train_generator:
+  # get features
+  features = model.predict(x)
+  #size of the batch (may not always be batch_size)
+  sz = len(y)
+  # assign to X_train and Y_train
+  X_train[i:i+sz] = features
+  Y_train[i:i+sz] = y
+  #increment i
+  i += sz
+  print(i)
+
+  if i >= Ntrain:
+    print('breaking now')
+    break
+print(i)
+
+X_train = np.zeros((Ntrain,D))
+Y_train = np.zeros(Ntrain)
+X_valid = np.zeros((Nvalid,D))
+Y_valid = np.zeros(Nvalid)
+
+```
+
+* we do the same for valid data
+```
+# populate X_valid and Y_valid
+i = 0
+for x,y in valid_generator:
+  # get features
+  features = model.predict(x)
+  #size of the batch (may not always be batch_size)
+  sz = len(y)
+  # assign to X_train and Y_train
+  X_valid[i:i+sz] = features
+  Y_valid[i:i+sz] = y
+  #increment i
+  i += sz
+  print(i)
+
+  if i >= Nvalid:
+    print('breaking now')
+    break
+print(i)
+```
+
+* we check feature value range after the body of the network and standardize for head phase of NN
+```
+X_train.max(), X_train.min()
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X_train2 = scaler.fit_transform(X_train)
+X_valid2 = scaler.transform(X_valid)
+```
+
+* we try SKlearn built in log regression to test results
+```
+# Try the built-in logistic regression
+from sklearn.linear_model import LogisticRegression
+logr = LogisticRegression()
+logr.fit(X_train2,Y_train)
+print(logr.score(X_train2,Y_train))
+print(logr.score(X_valid2,Y_valid))
+```
+
+* Then we do LogReg in TF
+```
+
+```
