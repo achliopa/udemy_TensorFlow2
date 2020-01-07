@@ -3410,4 +3410,157 @@ plt.legend()
 
 ### Lecture 70. Deep Reinforcement Learning Section Introduction
 
+* RL is very different from supervised (SL) or unsupervised learning (UL)
+* We can think SL as a static function, we pass in data and get a prediction
+* Even RNNs are a static method. we pass in a sequence and get a prediction, there is no actual concept of time
+* In a simulation game (self driving car) we can take a screenshot at each timestamp and decide what to do
+* SL is a function. RL is more like a control loop to achieve a goal
+  * It has an Agent interacting with the Environment
+  * Agent gets state and rewars from environemt. and triggers actions to the environment
+* RL has the concept of time built in. it can plan for the future. a series of actions to reach its future goal
+* In SL all input data must have a label. its humans who put the labels
+* If machines put correct labels we dont need ML
+* In an RL example Supervised driving its dificult for us to give the car specific action directions, and we cannot even do it for any frame
+* RL uses goals instead of labels or targets. e.g park the car or exit a maze
+
+### Lecture 71. Elements of a Reinforcement Learning Problem
+
+* RL Terminology:
+* The main objects are agent and environment
+* In a Tic Tac Toe game
+  * Env is the computer game implementing the game (even AI implementing Player 2). The Env can offer an API for interaction
+  * Agent is another program that interfaces with the Game
+* Episode, when interacting with the env. a series if actions take place and a goal is reached or not. this is an episode. like a game session or round
+* An environment is episodic if it ends and can start again
+* no relationship exists between episodes
+* there are non episodic environments e.g stock market
+* non episodic environments are called "infinite horizon"
+* States, actions, rewards describe how agent and enviornmnet interact
+* State: eg agent location, status of agent in e
+* Action: eg agent move
+* Reward: eg a number received at each step of a game. we van assign rewatds ourself to improve training
+* we can set max steps
+* we can set intermediate rewards
+* we can subtract 1 for every step to give incentive to solve it faster
+* we must receive a reward after each step
+* agent will try to maximize reward
+* State can get incredibly complex and constly but it should not.
+* it should have the minimum to go back to a perfectly defined state in the past
+* using screenshots as state is costly but resepmbles human perception
+* image has no concept of movement though
+* state in that case can be derived by looking at current and past observations. like subtracting images
+* In DQN 4 sequential frames are used to represent state
+* To describe spaces we need to understand sets.
+* State Spaces: set of all possible states
+* Action Spaces: set of all possible actions
+* The Canonical Example of RL is the Gridworld
+* State space is complicated while action space is usually simple
+* if we use screen as state the state space is the screen resolutuon.
+* images like time series are considered continuous-valued. the appear discreet because they are quantized
+* action space can also e infinite (continuous actions)
+
+### Lecture 72. States, Actions, Rewards, Policies
+
+* Rewards are just numbers no need for encoding
+* States and Actions are more complex and need encoding
+* States can be discrete or continuous:
+  * Discrete: tic-tac-toe game state
+  * Continuous: Robot with sensors
+* There is an analogy to SL (categorical vs linear)
+* If targets are discrete we encode them to integers or even one hot encode them.
+* If targets are continuous: we store them in vectors
+* Images are stored in tensors
+* In RL state usually is stored as a tensor with 1 or more dims
+* Policy: what the agent uses to determine what action to perform (given a state)
+* Policy yields an action given only the curent state. It does not use combos of past states or rewards,
+* State however could be made up of past observations or rewards although its unconventional
+* We can think of a Policy as a dictionary mapping (key value pair) key is the state, value is the action
+```
+def get_action(s):
+  a = policy[s]
+  return a
+```
+* We start by encoding states and actions then the policy
+* for Gridworld
+```
+actions = [up, down, left, right]
+policy = {
+  (0,0): right,
+  (0,2): right,
+  (1,0): up,
+  (1,2): up,
+  (2,0): up,
+  (2,1): right,
+  (2,2): up,
+  (2,3): left,
+}
+```
+* states are represented as tuples, using integers to index an array is more efficient. indexing arrays than indexing dictionaries
+* Encoding policy as dictionary has limitations (e.g infinite state space)
+* is restrictive. it does not allow agent to explore
+* policies must be stochastic / random
+* a general way is to express them as probabilities. it allows agent some randomness.
+* one method is called 'epsilon-greedy' vommone valie of ε=0.1
+```
+def get_action(s):
+  if random() < epsilon:
+    a = sample from action space
+  else:
+    a = fixed_policy[s]
+  return a
+```
+* Considering Policies as probailistic supports the concept of Continuous (Infinite) State Spaces
+* if state is a vector s (a D dimensional vector)
+* and policy paramteters is a vector W (shape W = Dx|A|)
+* W is the dimsnionality of state space by the size of action space
+* we consider action spave as categorical* to output probabilities for a set of categories? it looks like a classification problem so we use softmax 
+* for a given state s, we can calculate the probaility we should perform each action π(a|s) - softmax(WTs)
+* to choose an action we sample from π(a|s) or use argmax
+* this is a linear model approach, we can use a Neural Network instead
+* Is it possible for an agent to make an intelligent decision using only current state? does he need a target like in SL?? In RL training gives Agent experience and the ability to plan ahead. it will try to maximize future rewards
+
+### Lecture 73. Markov Decision Processes (MDPs)
+
+* We need a framework in RL to solve problemns in a consistent way
+* We can use it to define the problem accurately and find a solution
+* The main assumption in RL is the Markov assumption. It is uused in the context of sequence modeling
+* It says that next state is dependent on present state and not previous ones
+* There is work on RL hat does not use Markov assumption
+* Markov Assumption: State at time t depends only on the state at time t-1
+  * p(st|st-1,st-2...,s0) = p(st|st-1)
+  * State can be simple or complex. it is on our control to define it
+* Markov Decision Process (MDP): it describes a RL system
+* Markov Assumptions: we saw it in the state concept
+* MDP: we describe the environment with the state-transition brobability
+* The probability at ariving at a state at time t+1 and getting the reward at time t+1 giving the state and action at time t p(St+1,Rt+1|St,At) or p(s',r|s,a)
+* p(s',r|s,a) is the most general form of State-Transition Prob. sometimes reward is deterministic so we dont need to model it with probability
+  * State-trans-prob: p(s'|s,a)
+  * Reward function: R(s,a,s') or simply R(s),R(s')
+* In complex games the state space is infeasible to enumerate. how we will calcualte the State-Transition Probability?
+* In Q-Learning Algorithm, State-Trans_prob is not used at all
+* So why bother with MDP??? it is a step towards building practical RL solutions
+* simple Games involving physics (inverted pendulum) are modeled using physics laws that are deterministic not probabilistic. why we need State-Trans=Prob??
+* State may not capture the wholw info on a game. e.g if there is another player. you cant deterministicaly predict his move
+* also in physics there is chaos therory
+* State-Transition-Probability works as Environment Dynamics
+* MDP offers a system where Agent and Environment are represented as probabilities that interact with each other. this allows us to describe a RL system mathematicaly and solve the equations.
+  * Agent: π(a|s)
+  * Environment: p(σ',r|s,a)
+
+### Lecture 74. The Return
+
+* Agents goal is to maximize Rewards
+* Rewards maay be structured differently in different environments
+  * might be awarded per step or per episode
+* So what it means to maximize the reward? Agent wants to maximize the SUM of future rewards. this makes the agent to plan ahead for the future an is not deadlocked on the next step
+* In rela world working towards a big reward in the future might involve negative rewards in the process. if we go for the small rewards we lose the big reward
+* Sum of future rewards is called The Return (G). Some call it the 'utility' 
+* G(t) = Σ[τ=1->Τ-t]R(t+τ) = R(t+1)+R(t+2)+...+R(T)
+* If we have an Infinite Horizon MDP (game with no end) will our reward be infinite? no if we use discounting (discounting factor γ). Future rewards are discounted by a factor. γ is usually close to 1. it serves the purpose that the further we go in the future the harder is to predict rewards
+* G(t) = Σ[τ=1->Τ-t]γt-1R(t+τ) = R(t+1)+γR(t+2)+...+γΤ-t-1R(T)
+* Return can be defined recursively: G(t) = R(t+1) + γG(t+1)
+* R is Reward, G is return
+
+### Lecture 75. Value Functions and the Bellman Equation
+
 * 
