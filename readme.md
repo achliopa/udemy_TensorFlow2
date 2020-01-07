@@ -3563,4 +3563,36 @@ def get_action(s):
 
 ### Lecture 75. Value Functions and the Bellman Equation
 
-* 
+* We will finally express a generic RL problem with an equation from which we can derive a solution
+* We start with Expected Value. A.K.A Mean Value AKA Average
+* Expected value is not what we expect to get its just an artificial value
+* Expected Value (weighted sum):
+  * Discrete Random Vals: E(X) = Σ[κ=-inf->inf]p(x=k)k
+  * Continuous Random Val: E(X) = Integral[-inf->inf]xp(x)dx
+* Why expected values are important?
+  * rewards and thus return is a random variable
+  * environment dynamics (state-trans-prob) and policy are probabilities as well
+* it makes sense not to think about plain return but Expected Value of Return. then we will try to maximize the expected sum of future rewards
+* Value Function = Expected Return = Expected sum of future Rewards
+* For given state s at time t: V(s) = E(Gt|St=s) = E(Rt+1 + γRτ+2 + ... | St=s)
+* Return is expressed recursively and so is Value Function: V(s)=E(Rt+1 + γV(s') |St=s)
+* We now have all the pieces to build the Bellman Equation that expresses an MDP system. it is the Value Function expressed in terms of the probability equations for STP and Policy `V(s)=Σ[a]Σ[s']Σ[r]π(a|s)p(s',r|s,a){r+γV(s')}`
+* Bellman Equation is the cenerpiece of al upcoming RL solutions:
+  * it is built using probability math equations
+  * π(a|s) and p(s',r|s,a) express different physical processes, the Policy = Agent and State-Trans-Prob = Environment respectively
+* We finaly have a problem to solve...
+* There are multiple possible policies, good anf bad. 
+* To tell a good from a bad policy we check their Value Functions Vπ(s) = value function for policy π
+* Finding a value function for a given policy is called the Prediction Problem
+* if we know  π(a|s) and p(s',r|s,a) we can express Bellman Equation as a system of linear equations. for 3 states it can be expressed as
+```
+c11V(s1)+c12V(s2)+c13V(s3)=b1
+c21V(s1)+c22V(s2)+c23V(s3)=b2
+c31V(s1)+c32V(s2)+c33V(s3)=b3
+```
+* we can use `np.linalg.solve()` and find the V(s1),V(s2),V(s3).
+* So if we know Policy and State-Trans_Prob we can solve for Value Function using only Linear Algebra
+
+### Lecture 76. What does it mean to “learn”?
+
+*  
