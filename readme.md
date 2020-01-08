@@ -3797,4 +3797,69 @@ else:
 
 ### Lecture 80. Q-Learning
 
-* 
+* To get to Q-Learning Algorithm we had to:
+  *  Define relevant terms: agent,environment,state, action,reward
+  *  Define the math structure: MDP(Markov Decision Process): Agent =>[Take Action based on current state]=> Environment, Agent<=[get reward, new state]<=Env
+  *  Solve Prediction Problem: find the value function given a policy
+  *  Solve Control Problem: find the optimal policy in a given env
+  *  If we know the probabilities the problem is easy, if not we use Monte Carlo and samples
+* Monte Carlo Limitation
+  * To calculate results we have to wait till episode is over. return is the sum of rewards until the end of episode
+  * in games with infinite horizon or very long episonds we cannot use Monte Carlo
+  * even if episode ends MC is not ideal as agent performs suboptimal for long time untill improvement
+* Teporal Difference Methods are a solution to that
+  * we make use of the recursive structure of the return  `G(t) = R(t+1) + γΓ(t+1)`
+  * Monte Carlo MC is an approximation to the expected value problem used in Bellman Equation
+  * Temporal Difference (TD) is an approximation to MC
+* Monte Carlo Update Trick
+  * we converted the usual expression for sample mean to a gradient descent expression (using pure algebra) Q(s,a) = Q(s,a) + η(g-Q(s,a))
+  * instead of keeping old values around and adding them every time, we can calc the new estimate from the old estimate
+* The Gradient Descent Perspective
+  * We test the theory by defining J as the squared error between a sampe (g) and prediction V(s) `J=(g-V(s))^2`
+  * we calculate the gradient (we can ignore the 2 as it is absorved in learning rate)
+  *  V(s) <- V(s) - ηGRADV(s)J, GRADV(s)J = -2(g - V(s)), V(s) <- V(s) + η(g-V(s))
+* There is no difference between Gradient Ascent and Descent expressions
+  *  V(s) <- V(s) + η(g-V(s)) (ascent when derived from sample mean)
+  *  V(s) <- V(s) - η(V(s)-g (descent when derived from GD or loss)
+* Combine the Ideas:
+  * 1: updating the value function using the exponentialy decaying average is the same as gradient descent
+  * 2: the return can be defined recursively
+* We use gradient descent but now using the estimate return not the real one (g) as target
+* we then collect the next reward (r) and estimate the rest V(s')
+* instead of `g=r+γr'+γ^2r''+....` we use `g=r+γg' ~= r+γV(s')`
+* what we gain? we now have to wait just one step before updating the model not a whole episode
+* we call `r+γV(s')` a bootstrapped estimate of the return
+* Pseudocode like openAIGym
+```
+#given: env,policy
+V = random
+for i in range(num_episodes):
+  s = env.reset()
+  done = false
+  while not done:
+    a = policy[s]
+    s',r, done = env.step(a)
+    
+    # the big update
+    V(s) = V(s) + learning_rate *  (r+gamma*V(s')-V(s))
+    
+    # important: update the current state
+    s = s'
+# by now V(s) has converged (can also check it ourselves)
+```
+* There is an oddity in Temporal Diffeerence Learning
+* In `V(s) = V(s) + learning_rate *  (r+gamma*V(s')-V(s))`
+  * `r+γV(s')` is the target
+  * `V(s)` is the prediction
+  * in SL we are given the target as part of the dataset
+  * here we predict it. part of it is given `r` but `V(s')` is a model prediction like `V(s)`
+  * So the update method is not true gradient descent but Semi-Gradient Descent
+* We learned how to apply the TD method to the prediction problem
+* Now we will focus on the Control Problem 'Q-Learning'
+* We will finally solve the Control Problem using the Q-Learning Algorithm
+  * welook at Q rather than V
+  * we are mostly interested in the innermost part of the loop
+  * we must do 2 things: Choose an action, Update Q 
+```
+
+```
