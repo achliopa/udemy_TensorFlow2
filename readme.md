@@ -3595,4 +3595,206 @@ c31V(s1)+c32V(s2)+c33V(s3)=b3
 
 ### Lecture 76. What does it mean to “learn”?
 
-*  
+*  In RL there are 2 main tasks
+  * Prediction problem: Given a policy π, find the corresponding Value function V(s)
+  * Control problem: Find the optimal policy π* that yields the maximum V(s)
+* Value Function V(s) is also called State-Value function
+* Q(s,a) is the Action-Value functio (known as Q-table) or Bellman Equation for Q
+  * we dont need to sum over action as it is given
+  * `Q(s,a) = E(r+γV(s')|St=s,At=a)`
+  * `Q(s,a) = Σ[s']Σ[r]p(σ',r|s,a){r+γV(s')}`
+* How much space is needed to store the Value Functions V(s) and Q(s,a)
+  * We assume a finite set of discrete states |S| and actions |A|
+  * V(s) can be stored in an array of size |S| (Linear Complexity O(n))
+  * Q(s,a) can be stored in a 2-D array of size |S|x|A| (Quadratic Complexity O(n2))
+* The optimalpolicy is the one that maximizes the value for all states
+  * π1 >= π2 if Vπ1(s)  > Vπ2(s)  for all s in |S| 
+* Best Value Function: `V*(s) = maxπVπ(s)` for all s in |S|
+* Best Policy derived from Value Function: `π* = argmaxπVπ(s)` for all s in |S
+* Βest Action-Value Function: `Q*(s,a)=maxπQπ(s,a)` for all s in |S|
+* Best Value Function derived from Action Value Function: `V*(s) = maxaQ*(s,a)` for all s in |S|
+* If we find the optimal action value it is very easy to choose the best action given the state: `a*=argmaxa:*(s,a)`. it is fust a dictionary lookup
+* * A simple way to find the optimal policy is a Naive Search
+```
+policies = enumerate_all_possible_policies()
+best_policy = None
+best_value = {s1: -inf, s2: inf, ..., sN: -inf}
+for policy in policies:
+  current_value = evaluate(policy)
+  if current_value > best_value
+    best_value = current_value
+    best_policy = policy
+# now best_policy stores best policy
+```
+
+* `evaluate(policy` we saw how to do it when we know Agent π(a|s) and Environment p(s',r|s,a)
+* enumerating all possible policies is simple to understand but impractical
+
+### Lecture 77. Solving the Bellman Equation with Reinforcement Learning (pt 1)
+
+* W saw there are 2 types of problems
+  * Prediction problem: find V(s). Ιf we know all probabilities (π(a|s) and p(s',r|s,a)) it is a simple linear algebra problem
+  * Control problem: find π*, loop through all possible policies, return the one that yields the best V(s)
+* Except from trivial games its impossible to know all the environment dynamics (posibilities). All we can do is repeat the episode 1000s of times
+* But also state space can be extremely large
+* So usually we cannot rely on enumerating all states and figuring out all strate-trans probabilities
+* Control Problem: Can we enumerate all possible policies. their number is |S|^|A|. it grows exponentially
+* The solution to all this is to work with the Expected Value (Mean). To calculate it we must know the distribution
+* We can estimate the mean with the sample mean. `E(X)~~(1/N)Σ[i=1->Ν]xi` where x are the sampes, when N->inf, sample mean equals actual mean
+* Sample mean is extensively used in experimental sciences
+* The value function is the Expected Return (we saw that). We can sample many returns to estimate the value of each state
+  * G(t) is generic random variable. return at time t
+  * g(i,s) means a sample of return. the ith time we reacheched state s (ith sample return from state s)
+  * `V(s)=E(Gt|St=s)~~(1/N)Σ[i=1->N]g(i,s)`
+* How samples are obtained?? to sample from a std distribution `np.random.randn()`. But return is different in every episode, even with same policy and environment as botha re probabilistic
+* To Calculate Rewards from Samples We use the Monte Carlo approach (Monte Carlo sampling)
+  * given a policy we try to find a value function
+  * the idea: playing an episode yields a series of states and correcponding rewards
+  * key point: go backwords and use the recursive definition
+  * gT=0 as there are no future states so V(sT)=0
+  * gT-1=rT
+  * gT-2=rT-1+γrT=rT-1+γgT-1
+  * gT-3=rT-2+γgT-2
+  * gt=rt+1 + γgt+1
+```
+states, rewards = play_episode_using_policy
+
+returns = []
+g = 0
+returns.append(g)
+for r in reversed(rewards):
+  g = r + gamma*g
+  returns.append(g)
+```
+* now we run it 100s of times to collect samples
+```
+policy = ... # given as input
+sample_returns = {} # state -> list of returns
+for i in range(num_episodes):
+  states, rewards = play_one_episode(policy)
+  returns = ...calculate as previously discussed...
+  for s,r in zip(states, returns):
+    sample_returns[s].append(r)
+```
+
+* for each state take the average return of the samples
+```
+# calculate the average return
+V = {}
+for s, g_list in sample_returns.items():
+  V[s] = np.mean(g_list)
+```
+* with theis approach we cannot ensure we encountered every possible state during episodes
+
+### Lecture 78. Solving the Bellman Equation with Reinforcement Learning (pt 2)
+
+* For prediction we want V(s)
+* For control we want Q(s,a), it allows us to select the best action to perform `a*=armaxaQ*(s,a)`
+* Policy iteration and Policy Improvement
+  * Given a policy, we can use Monte Carlo to evaluate the Value Function V(s) or Q(s,a)
+  * Given the aaction value Q(s,a) we can choose the best action
+  * We see the dependency and the loop formed => find Q(s,a) given π "evaluation", find π as argmax Q(s,a) "improvement"
+* Ints proven with math that this process leads to monotonic improvemnt in thepolicy
+* By repeating this process untill convergence we get the optimal prolicy
+```
+Q = random. policy = randomfor i in range(num_eposodes):
+  Q = evaluate(policy) # policy evaluation step
+  for s in Q.states(): # policy improvement step
+    policy[s] = argmax{ Q(s, :) }
+```
+* Earlier we looked at evaluating V(s) using Monte Carlo
+* To evaluate Q(s,a) we need to keep track apart from states and rewards on actions too
+* We end up with triples: {(s1,a1,r1),(s2,a2,r2)...}
+```
+policy = ... # given as input
+sample_returns = {} # (s,a) -> list of returns
+for i in range(num_episodes):
+  states, actions, rewards = play_one_episode(policy)
+  returns = ...calculate as previously discussed...
+  for s,a,r in zip(states,actions,returns):
+    sample_returns[s,a].append(r)
+```
+* Calculate Q as mean
+```
+Q = {}
+for s,a,q_list in sample_returns.items():
+  Q[s,a] = np.mean(q_list)
+```
+* Our solution works but is not ideal
+  * V(s) must store |S| vals, Q(s,a) |S|x|A| vals
+  * Monte Carlo sampling gives better results the more samples we collect
+  * with Q we have more vals to estimate thus we need more samples
+  * we use nested loops in our calculations (slow)
+* Value iteration works better:
+  * Its not elegant but it works
+  * In evaluation step, instead of playing muliple episodes to obtain a Monte Carlo estimate of the value, just play one episode
+  * we ll only get a single series of states, actions, returns
+  * use this to update a single running copy of Q(s,a) and policy
+```
+Q = random, policy=random
+for i in range(num_episodes):
+  # replace policy evaluation with one episode only
+  states, actions, rewards = play_one_episode(policy)
+  returns = ...calculate as previously discussed...
+  # update Q(s,a) and policy
+  for s,a,q in zip(states,actions,returns):
+    Q(s,a) = update Q(s,a) with the latest return q
+  for s in Q.states(): # policy improvement step
+    policy[s] = argmax{ Q(s,:)}
+```
+* ` Q(s,a)` should be the mean of asamples. is it efficient? NO
+* Taking the sum of N samples is O(N)
+* instead we can calculate the Nth sample mean from the N-1th sample mean
+```
+XavgN = (1/N)Σ[i=1->N]xi=...= ((N-1)/N)ΧavgΝ-1 + (1/N)xN = XavgN-1 + 1/N(xN - XavgN-1)
+```
+* This looks like gradient descent and in fact it is `XavgN = ((N-1)/N)ΧavgΝ-1 + (1/N)xN`
+  * `XavgN-1` is the prediction
+  * `xN` is the target (nth collected sample)
+  * `1/N` is the learning rate (decays over time)
+* We rewrite the equation in terms of Q(s,a) and g (sample) `Q(s,a)=Q(s,a)+1/N(g-Q(s,a))` which is an assignemnt
+* We only have 1 copy of Q. all the samples we collect on each iteration come from different policies (policies are updated at each step)
+* The samples we collect do not come from the same distribution... Problem. Our intuition says that old samples come from older policies thus matter less. than new samples
+* To workaroud our finding instead of using 1/N as learning rate which yields a standard (equaly weighted average) we use a constant learning rate that yields an exponentialy decaying average
+* `Q(s,a)=Q(s,a) + η(g -Q(s,a))`
+* Pseudocode
+```
+Q = random, policy=random
+for i in range(num_episodes):
+  # replace policy evaluation with one episode only
+  states, actions, rewards = play_one_episode(policy)
+  returns = ...calculate as previously discussed...
+  # update Q(s,a) and policy
+  for s,a,q in zip(states,actions,returns):
+    Q(s,a) = Q(s,a) + learning_rate * (g - Q(s,a))
+  for s in Q.states(): # policy improvement step
+    policy[s] = argmax{ Q(s,:)}
+```
+
+### Lecture 79. Epsilon-Greedy
+
+* Policy as Distribution
+* Advantages:
+  * Entire MDP is just 2 probabilities: π(a|s) aνδ p(s',r|s,a)
+  * in order to find the best action we need to know the result of performing these actions (we need to collect the samples)
+* Problem: currently we take argmax to determine action. Q does not change much
+  * say we have 3 actions: Q(s,a1),Q(s,a2),Q(s,a3). we init them to 0,0,1 and all rewards are +ve
+  * during game Q(s,a3) is updated to 2 after few episodes. we will never know the true values of Q(s,a1) and Q(s,a2) as we can never use them
+* It all boils down to the explore-exploit dilemma. we must balance exploration and exploitation
+  * explore: collect more data to determine which policy is truly the best
+  * exploit use the best policy with minimum cost to get maximum turnover
+* In RL this is called Epsilon-Greedy:
+  * we have a small probability (a hyperparam called ε) of choosing a random action
+  * otherwise we will perform the greedy action (argmax over Q(s,:))
+```
+# Instead of a=argmax(Q[s,:])
+# use 
+if random() < epsilon:
+  a = action_space.sample()
+else:
+  a = argmax(Q[s,:])
+```
+
+### Lecture 80. Q-Learning
+
+* 
