@@ -3857,9 +3857,227 @@ for i in range(num_episodes):
 * We learned how to apply the TD method to the prediction problem
 * Now we will focus on the Control Problem 'Q-Learning'
 * We will finally solve the Control Problem using the Q-Learning Algorithm
-  * welook at Q rather than V
+  * we look at Q rather than V
   * we are mostly interested in the innermost part of the loop
-  * we must do 2 things: Choose an action, Update Q 
+  * we must do 2 things: 1. Choose an action, 2. Update Q 
+```
+def choose_action(Q,s):
+  if random() < epsilon:
+    return random action
+  else:
+    return argmax{Q(s,:)}
+
+Inside the main loop:
+# choose action and execute
+a = choose_action(Q,s)
+s',r,done = env.step(a)
+# update Q
+y = r + gamma * max_a'{ Q(s',a')} # target
+Q(s,a) = Q(s,a) + learning_rate * (y - Q(s,a))
 ```
 
+* when calculate a target it does not matter what action we choose next (a')
+* we assume we will take the greedy action and get the max over Q given the state s'
+* Advantage:
+  * we dont have to wait until we determine the next action to update Q
+  * it makes Q-Learning an off-policy algorithm (the update might not match the action taken)
+* So we can freely explore while the algorithm will update the Q tBLW as if we had acted greedily
+* Pseudocode
 ```
+def choose_action(Q,s):
+  if random() < epsilon:
+    return random action
+  else:
+    return argmax{Q(s,:)}
+
+env = ... #given: some environment object
+Q = random
+for i in range(num_episodes):
+  s = env.reset()
+  done = false
+  while not done:
+    a = choose_action(Q,s)
+    s',r, done = env.step(a)
+    
+    # update Q
+    y = r + gamma * max_a'{ Q(s',a')}
+    Q(s,a) = Q(s,a) + learning_rate * (y - Q(s,a))
+    
+    # important: update the current state
+    s = s'
+# by now Q(s,a) has converged (can also check it ourselves)
+```
+
+### Lecture 81. Deep Q-Learning / DQN (pt 1)
+
+* Deep Q-Learning = Q-Learning using Neural Networks
+  * Agent gets Reward from Env
+  * Agent Observs state from Env
+  * Agent takes action to Env
+  * In Agent from state as Input a DNN outputs the optimal policy based on which action is taken
+
+* Q-Learning involves finding the optimal Q*(s,a) and the corresponding optimal policy π*
+* so far: 
+  * states/actions are categorical (encoded by integers starting at 0)
+  * most of what we discussed was in the context of tabular methods (States as rows, actions as columns, Q(s,a) as cells)
+* If our State or Action Space is continuous or infinite, storing a Q table is non viable
+  * we can use the binning method to force a discrete finite set of states/actions. like cluster continuous vals itno categories (bins)
+  * a more flexible approach is to use machine learning (function approximation)
+  * these are called approximaton methods compared to  tabular methods
+* In DQN (Deep-Q-Learning) the state space is possible infinite but the action space discrete
+* suppose our state is a vector s and we have 2 actions a0 and a1
+  * Q(s,a0) = w0Ts+b0
+  * Q(s,a1) = w1Ts+b1
+* we can combine weights and bias into vectors Q(s,:) = WTs+b
+  * W is of shape DxK
+  * b is a vector of length K
+  * : means select all elements in this dimension
+* In Inverted Pendulum
+  * State has 4 components: s = (x,dx/dt,θ,dθ/dt)
+  * action is -1 or +1  force to the cart
+  * For Q(s,a) shape(W)=(4,2), shape(b)=(2,)
+  * For V(s) shape(W)=(4,2) b is scalar
+* when we discussed TD and MC learning we updated V(s) and Q(s,a) directly as they were just table values
+* Now that tey are vectors we need to update w and b
+* The treat finding V(s) as a Supervised Learning Problem
+  * Target is `r+γV(s')` the estimation of the return, if its terminal state, target = r
+  * Prediction is `V(s) = WTs+b`
+* this is a regression problem. we need to get the square root eeror and do gradient descent to update params 
+* although V(s) and V(s') depend on params w,b we differentiate with respect to V(s) only
+```
+J = (r + γV(s') - V(s))^2
+δJ/δw = [V(s) - (r + γV(s'))]s
+δJ/δb = V(s) - (r + γV(s'))
+```
+* The Pseudocode for the prediction problem becomes
+```
+env = ... #given: some environment object
+policy = ... # given: some policy
+w,b = random
+for i in range(num_episodes):
+  s = env.reset()
+  done = false
+  while not done:
+    a = policy(s)
+    s', r', done = env.step(a)
+    # the big update
+    V(s) = w.dot(s) + b
+    V(s') = w.dot(s') + b
+    w = w - learning_rate * (V(s) - (r + gamma*V(s')))s
+    b = b - learning_rate * (V(s) - (r + gamma*V(s')))
+    # important: update current state
+```
+* Approximating V(s) is not by itself useful
+* What if we use V(s) to help us choose an action. 
+* but how? we know that normally we would take the argmax of Q(s,a) over all a
+* V(s) is not indexed by any action. only state
+* A suboptimal approach
+  * Pretend we have a special env, where we can try an action and go back to the previous state
+  * In real envs we cannot just go back to state s
+* A realistic approach is to use Q(s,a) instead
+  * Target is: `y = r + γmaxa'Q(s',a')`, if its terminal its just r
+  * Prediction is Q(s,a)
+  * Params to update are still W and b
+* Updating Q(s,a):
+  * Only components of W and b corresponding to the action taken (a) are updated
+  * Its equivalent to saying that the error for actions not taken is zero
+```
+J = (r + γQ(s',a') - Q(s,a))^2
+δJ/δwa = [Q(s,a) - (r + γmaxa'Q(s',a'))]s
+δJ/δba = Q(s,a) - (r + γmaxa'Q(s',a'))
+```
+* Q-Learning when using approximation methods, we use epsilon-greedy for exploration
+```
+def choose_action(s):
+  if random() < epsilon:
+    return random action
+  else:
+    Q(s,:) = s.dot(W) + b
+    return argmax(Q(s,:))
+
+env = ... #given: some environment object
+w,b = random
+for i in range(num_episodes):
+  s = env.reset()
+  done = false
+  while not done:
+    a = choose_action(s)
+    s', r', done = env.step(a)
+    # Update Q
+    y = r + gamma * max_a'{Q(s',a')}
+    W[a] = W[a] - learning_rate * (y - Q(s,a))s
+    b[a] = b[a] - learning_rate * (y - Q(s,a))
+    # important: update current state
+    s = s'
+```
+
+### Lecture 82. Deep Q-Learning / DQN (pt 2)
+
+* Is it not trivial to replace the Linear Regression with a NN?
+* we use the princple that all ML interfaces are the same
+* this is better because we dont know if Q is linearly dependent on s
+* conceptually we only need to continue using Gradient Descent
+* Θ represents all params of the model here
+* Gradient will be complicated, so we can use automatic differentiation
+```
+J = (r+γmaxa'Q(s',a') - Q(s,a))^2
+δJ/δθ = [Q(s,a) - (r+γmaxa'Q(s',a'))]δQ(s,a)/δθ
+```
+* Τraining NNs is inherently unstable, we can not just chose any hyperparam and expect good results.Sometimes cost explodes, or model wont fit
+* Linear Regression is much more stable than NNs
+* TD Learning is by itself unstable. we do grad descent but target is not a real target and so loss is no real loss and gradient no real gradient. all are approximations
+* When we combine both we get sthing that barely works if it works at all
+* there are a number of approaches to Deep Q-Learning (DQN).we ll see just 1
+* Its the experience replay buffer / experience replay memory
+* what we used in DNNs was stochastic gradient descent SGD (one sample at time)
+* what we want to do is batch gradient descent that more stable working with multiple samples at a time
+* In TF, people call it SGD even when they work with batches
+* we can try it using different batch sizes (1,32,128 ,, N) on existing SL models using the full dataset as batch , our loss should decrease monotonically
+* Sample Collection Hints
+  * not good to have sequential samples correlated when doing GD
+  * that why we shuffle data on each epoch
+  * we ll see how to randomize the replay buffer to avoid seeing the tuples in the order they were encountered again and again
+* Replay Buffer can work as a python list storing tuples (s,a,r,s',done) as we encounter them. these tuples are called transitions
+* its an 1 line addition to our loop, everytime we take a step in environment we add a transition tuple to our replay buffer
+* At some point the transitions in the replay buffer are stale snd correspond to a policy very different from the currrent one 
+* when adding new transitions we remove old ones when buffer is full
+```
+s',r,done = env.step(a)
+replay_buffer.append((s,a,r,s',done))
+if len(replay_buffer) > max_size:
+  replay_buffer.pop(0)
+```
+* When we want to updatte
+  * sampe a batch of transitions from repolay buffer
+  * populate inputs and targets in our DNN
+  * do one step of DG on the data
+```
+batch = random.sample(replay_buffer)
+inputs = [], targets = []
+for s,a,r,s',done in batch:
+  inputs.append(s)
+  y = r + gamma *  max)a'{Q(s',a')}
+  targets.append(y)
+model.train_on_batch(inputs,targets) # one step of GD
+```
+* Pseudocode for Deep Q-Learning
+```
+env = ... #given: some environment object
+replay_buffer = []
+model = Model() # a neural net with random initialization
+for i in range(num_episodes):
+  s = env.reset()
+  done = false
+  while not done:
+    a = choose_action(s)
+    s', r', done = env.step(a)
+    update_replay_buffer(s,a,r,s',done)
+    # Update Q
+    train() # as described earlier
+    # important: update current state
+    s = s'
+```
+
+### Lecture 83. How to Learn Reinforcement Learning
+
+* W
