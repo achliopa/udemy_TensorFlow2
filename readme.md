@@ -4080,4 +4080,195 @@ for i in range(num_episodes):
 
 ### Lecture 83. How to Learn Reinforcement Learning
 
-* W
+* When we learn SL and UL many courses avoid implementing the models (they use them ready from SKlearn)
+* We end up not even knowing what we don't know. we cant fix problems in our code or results
+* Thats maybe Ok if we just ant to use APIs
+* In RL there are no APIs (not yet)
+* If we dont know to implement ML algorithms we are in deep shit.
+* To learn RL for real we need a full course or multiple ones. learn and experiment with tabular RL before moving to approximation methods
+* Learn about 3 basic approaches
+  * Dynamic Programming
+  * Monte Carlo
+  * Temporal Difference
+* then graduate to approximation methods with linear models
+* then apply deep learning
+* Deep RL is very hard to get right even for expert programmers (it can take 1 year for a single game)
+
+## Section 12: Stock Trading Project with Deep Reinforcement Learning
+
+### Lecture 84. Reinforcement Learning Stock Trader Introduction
+
+* When people think about applying ML to the stock market:
+  * They think about predicting the value of a stock
+  * or even the direction. (go up or go down)
+* this info doesnt make it happen
+  * we must sit down and make the trade from our computer
+  * it is not even sure we will act on themodel predictions
+* (Un)Supervised Learning makes the prediction but does not take action
+* RL makes predictions and takes actions in the environment we provide (the action it believes will maximize reward)
+* Stock prices we can think as Time Series. it sounds as a prediction problem for RNNs rather than RL
+* RL perspective
+  * consider we use a stock trading API `api.buy('GOOG',10)`if each share is $50, we are -$500 in our account and we own 10 shares of GOOG
+  * if we use `api.sell('AAPL',5)` and APPLE shares are $30 we are +$150 and we lost 3 shares of APPLE
+* We can treat the api calls as actions and the stock prices at any given time as state
+* Environment is the Stock Market. there is inherent randomness.we cannot predict tomorrows stock prices
+* we have areal RL problem
+  * actions = buy/sell/hold
+  * state = stock prices/#shares owned/account balance
+  * reward = function of portfolio value gained/lost
+* we as agents follow the rule "buy low/sell high" maybe if we dont need the money and
+* but in real world we make choices without knowing the future..
+
+### Lecture 85. Data and Environment
+
+* we will work with historical stock data (as a simulation)
+* we build the environment in OpenAI Gym style
+```
+env = MYTradingSimulationEnv()
+done = False
+state = env.reset() # bring us back to init state
+while not done:
+  action = get_action(state) # could come from our agent
+
+  # perform the trade, 'info' contains portfolio value
+  next_state, reward, done, info = env.step(action)
+  
+  state = next_state
+```
+* State Variables:
+  * consider a fixed window of past and current stock prices
+  * do we have cash to buy?
+  * given our portfolio, is it worth selling to get cash for trades?
+  * we need to keep it simple
+  * we get ideas from "Practical Deep RL Approach for Stock Trading" paper. they use DDPG (advanced algo)
+  * According to paper our state will have 3 parts: 1) how many shares of each stock we own 2) current price of each stock 3) pure cash we have
+  * For N stocks our state vector has size 2N+1
+* Actions:
+  * many options
+  * for any stock: buy/sell/hold
+  * for a simple env we consider 3 stocks AAPL,MSI,SBUX. we have 3^3=27 osssibilities e.g [sell,sell,sell]
+  * but we can trade >1 stocks..
+  * to simplify we will ignore transaction costs, when we sell we will sell all our shares, when we buy we will buy as many as possible given our cash
+  * still its complicated (Knapsack problem), we want to avoid it as its NP hard
+  * when we buy multiple stocks we will do it round robin. loop through every stop, buy 1 till money dries out,
+  * also we will sell before buy to have max cash
+  * all these conventions are to get down to 27 actions
+  * one action in our env will involve performing all steps at once
+* Reward:
+  * simple. the change in value of our portfolio from one step (state s -> state s') + cash
+```
+s = vector of # shares owned
+p = vector of share prices
+c = cash
+potfolio value = sTp+c
+```
+
+### Lecture 86. Replay Buffer
+
+* How to implement Replay Buffer / Replay Mem efficienty?
+* Start with naive approach. just a Python List storing 5element tuples (s,a,r,s',done) aka 'transitions'
+* we will add them as we get them. buffer will have a max size. when we hit it throw oldest val
+* during train we will grab minibatches from buffer for training (do grad descent)
+```
+minibatch = random.sample(buffer, batch_size)
+targets = []
+# calculate input-target pairs
+# for each sampe in the minibatch (s,a,s',r,done)
+for (s,a,s',r,done) in minibatch:
+  if done:
+    target = reward
+  else: 
+    target = reward + gamma * max[a']{Q(s',a')}
+  targets.append(target)
+```
+* we prefer numpy batch operations than for loops for performance
+* with appending new tuples and poping old ones the lists grows without stop and it leads to memory leaks
+* to avoid it we need to implement our own replay buffer
+* we will preallocate arrays
+  * States (NxD)
+  * Actions (N)
+  * Rewards (N)
+  * Next states (NxD)
+  * Done flags (N)
+* we will never allocate more arrays or remove existing
+* we will use a pointer to tell us where to store the next value
+* our buffers will be circular. when we reach the end go back to start
+* when buffer is not yet full we must keep track of size
+
+### Lecture 87. Program Design and Layout
+
+* 2 modes of operation: train and test
+* train data must come before test data
+* top level code organization
+```
+env = Env()
+agent = Agent()
+portfolio_values = []
+for _ in range(num_episodes):
+  val = play_one_episode(agent,env)
+  portfolio_values.append(val)
+plot(portfolio_values)
+```
+* we dive in play one episode function
+```
+def play_one_episode(agent, env):
+  s = env.reset()
+  done = False
+  while not done:
+    a = agent.get_action(s)
+    s',r,done,info = env.steps(a)
+    if train_mode:
+      agent.update_replay_memory(s,a,r,s',done)
+      agent.replay() # sample batch and do gradient descent
+    s = s'
+  return info['portfolio_val']
+```
+* our data is not normalized
+* different parts of state have different ranges
+* # shares owned, stock prices, cash
+```
+...
+state = env.reset()
+state = scaler.transform(state)
+...
+next_state,reward,done,info = env.step(action)
+next_state = scaler.transform(next_state)
+...
+```
+* environment object
+```
+class Environment:
+  def __init__(self,stock_prices,initial_investment):
+    self.pointer = 0
+    self.stock_prices = stock_prices
+    self.initial_investment = initial_investent
+  
+  def reset(self):
+    # reset pointer to 0 and return initial state
+  
+  def step(self,action):
+    # perform the trade, move pointer
+    # calculate reward, next state, portfolio value, done
+```
+* Agent
+```
+class Agent:
+  def __init__(self):
+    self.replay_buffer = ReplayBuffer()
+    self.model = Model()
+  
+  def update_replay_buffer(self,s,a,r,s',done):
+    # store in replay buffer
+  
+  def get_action(self,s):
+    # calculate Q(s,a), take the argmax over a
+  
+  def replay(self):
+  # sample from replay_buffer, make input-target pairs
+  # model.train_on_batch(inputs,targets)
+```
+* in train mode we replay the episode again and again to maximize return (store states/actions/rewards => update Q(s,a))
+
+### Lecture 88. Code pt 1
+
+* we can run our code locally or in colab. locally its should run faster?!!?
