@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense,Input
+from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.optimizers import Adam
 
 from datetime import datetime
@@ -33,17 +33,17 @@ def get_data():
   df = pd.read_csv('aapl_msi_sbux.csv')
   return df.values
 
+
 ### The experience replay memory ###
 class ReplayBuffer:
-  def __init__(self,obs_dim,act_dim,size):
-    self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32) # state
-    self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32) # next state
-    self.acts_buf = np.zeros(size, dtype=np.unit8) # actions
+  def __init__(self, obs_dim, act_dim, size):
+    self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
+    self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
+    self.acts_buf = np.zeros(size, dtype=np.uint8)
     self.rews_buf = np.zeros(size, dtype=np.float32)
-    self.done_buf = np.zeros(size, dtype=np.unit8)
-    self.ptr, self.size, self.max_size = 0, 0, size # buffer pointer
-  
-  # store transition into buffer
+    self.done_buf = np.zeros(size, dtype=np.uint8)
+    self.ptr, self.size, self.max_size = 0, 0, size
+
   def store(self, obs, act, rew, next_obs, done):
     self.obs1_buf[self.ptr] = obs
     self.obs2_buf[self.ptr] = next_obs
@@ -53,21 +53,21 @@ class ReplayBuffer:
     self.ptr = (self.ptr+1) % self.max_size
     self.size = min(self.size+1, self.max_size)
 
-  # sampling by selecting random indices
   def sample_batch(self, batch_size=32):
-    idxs = np.random.randint(0,self.size, size=batch_size)
+    idxs = np.random.randint(0, self.size, size=batch_size)
     return dict(s=self.obs1_buf[idxs],
                 s2=self.obs2_buf[idxs],
                 a=self.acts_buf[idxs],
                 r=self.rews_buf[idxs],
                 d=self.done_buf[idxs])
 
+
 def get_scaler(env):
   # return scikit-learn scaler object to scale the states
-  # note: you could also populate the replay buffer here
+  # Note: you could also populate the replay buffer here
 
   states = []
-  for _ in range(env, n_step):
+  for _ in range(env.n_step):
     action = np.random.choice(env.action_space)
     state, reward, done, info = env.step(action)
     states.append(state)
@@ -85,7 +85,7 @@ def maybe_make_dir(directory):
 
 
 def mlp(input_dim, n_action, n_hidden_layers=1, hidden_dim=32):
-  # A multi-layer-perceptron #
+  """ A multi-layer perceptron """
 
   # input layer
   i = Input(shape=(input_dim,))
@@ -102,30 +102,28 @@ def mlp(input_dim, n_action, n_hidden_layers=1, hidden_dim=32):
   model = Model(i, x)
 
   model.compile(loss='mse', optimizer='adam')
-  print(model.summary())
+  print((model.summary()))
   return model
 
 
 class MultiStockEnv:
   """
-    A 3-stock trading environment.
-    State: vector of size 7 (n_stock * 2 + 1)
-      - # shares of stock1 owned
-      - # shares of stock2 owned
-      - # shares of stock3 owned
-      - price of stock 1 (using daily close price)
-      - price of stock 2 (using daily close price)
-      - price of stock 3 (using daily close price)
-      - cash owned (can be used to purchase more stocks)
-    Action: categorical variable with 27 (3^3) possibilities
-      - for each stock you can:
-        - 0 = sell
-        - 1 = hold
-        - 2 - buy
+  A 3-stock trading environment.
+  State: vector of size 7 (n_stock * 2 + 1)
+    - # shares of stock 1 owned
+    - # shares of stock 2 owned
+    - # shares of stock 3 owned
+    - price of stock 1 (using daily close price)
+    - price of stock 2
+    - price of stock 3
+    - cash owned (can be used to purchase more stocks)
+  Action: categorical variable with 27 (3^3) possibilities
+    - for each stock, you can:
+    - 0 = sell
+    - 1 = hold
+    - 2 = buy
   """
-  ############# PUBLIC METHODS ################
 
-  # data input is a 2D array with a timeseries of stock prices
   def __init__(self, data, initial_investment=20000):
     # data
     self.stock_price_history = data
@@ -145,8 +143,12 @@ class MultiStockEnv:
     # [0,0,0]
     # [0,0,1]
     # [0,0,2]
-    # ...
-    # 0 = sell, 1 = hold, 2 = buy
+    # [0,1,0]
+    # [0,1,1]
+    # etc.
+    # 0 = sell
+    # 1 = hold
+    # 2 = buy
     self.action_list = list(
         map(list, itertools.product([0, 1, 2], repeat=self.n_stock)))
 
@@ -158,9 +160,9 @@ class MultiStockEnv:
   def reset(self):
     self.cur_step = 0
     self.stock_owned = np.zeros(self.n_stock)
-    self.stock_price = self.stock_price_history(self.cur_step)
+    self.stock_price = self.stock_price_history[self.cur_step]
     self.cash_in_hand = self.initial_investment
-    return self._get_obs()  # return state vector
+    return self._get_obs()
 
   def step(self, action):
     assert action in self.action_space
@@ -170,15 +172,15 @@ class MultiStockEnv:
 
     # update price, i.e. go to the next day
     self.cur_step += 1
-    self.stock_price = self.stock_price_history(self.cur_step)
+    self.stock_price = self.stock_price_history[self.cur_step]
 
     # perform the trade
     self._trade(action)
 
-    # get the new value after taking te action
+    # get the new value after taking the action
     cur_val = self._get_val()
 
-    # reward is the increase in portfolio value
+    # reward is the increase in porfolio value
     reward = cur_val - prev_val
 
     # done if we have run out of data
@@ -187,15 +189,13 @@ class MultiStockEnv:
     # store the current value of the portfolio here
     info = {'cur_val': cur_val}
 
-    # conform to the OpenAI Gym API
+    # conform to the Gym API
     return self._get_obs(), reward, done, info
 
-  ######## PRIVATE METHODS #############
-
-  def _get_obs(self):        # get state, a vector of 3 components
+  def _get_obs(self):
     obs = np.empty(self.state_dim)
-    obs[:self.n_stock] = self.stock_owned  # list of size 3
-    obs[self.nstock:2*self.n_stock] = self.stock_price  # value of the stock
+    obs[:self.n_stock] = self.stock_owned
+    obs[self.n_stock:2*self.n_stock] = self.stock_price
     obs[-1] = self.cash_in_hand
     return obs
 
@@ -207,11 +207,11 @@ class MultiStockEnv:
     # 0 = sell
     # 1 = hold
     # 2 = buy
-    # e.g. [2,1,0] means
-    # buy 1st stock
-    # hold 2nd stock
-    # sell 3rd stock
-    action_vec = self.action_list[action]  # vector of size 3
+    # e.g. [2,1,0] means:
+    # buy first stock
+    # hold second stock
+    # sell third stock
+    action_vec = self.action_list[action]
 
     # determine which stocks to buy or sell
     sell_index = []  # stores index of stocks we want to sell
@@ -225,13 +225,13 @@ class MultiStockEnv:
     # sell any stocks we want to sell
     # then buy any stocks we want to buy
     if sell_index:
-      # Note: to simplify the problem. when we sell, we sell ALL shares of that stock
+      # NOTE: to simplify the problem, when we sell, we will sell ALL shares of that stock
       for i in sell_index:
         self.cash_in_hand += self.stock_price[i] * self.stock_owned[i]
         self.stock_owned[i] = 0
     if buy_index:
-      # Note: when buying, we will loop through each stock we want to buy
-      #       and buy one share at a time untiull we run out of cash
+      # NOTE: when buying, we will loop through each stock we want to buy,
+      #       and buy one share at a time until we run out of cash
       can_buy = True
       while can_buy:
         for i in buy_index:
@@ -258,9 +258,9 @@ class DQNAgent(object):
 
   def act(self, state):
     if np.random.rand() <= self.epsilon:
-      return np.random.choice(self.action-size)
+      return np.random.choice(self.action_size)
     act_values = self.model.predict(state)
-    return np.argmax(act_values[0])  # return action
+    return np.argmax(act_values[0])  # returns action
 
   def replay(self, batch_size=32):
     # first check if replay buffer contains enough data
@@ -277,23 +277,22 @@ class DQNAgent(object):
 
     # Calculate the tentative target: Q(s',a)
     target = rewards + self.gamma * \
-        np.amax(self.model.predict(next_state), axis=1)
+        np.amax(self.model.predict(next_states), axis=1)
 
-    # The value of terminal states in zero
+    # The value of terminal states is zero
     # so set the target to be the reward only
     target[done] = rewards[done]
 
-    # target is 1D while predictions 2D (batch_size , num_of_actions) array
-    # with the Keras API, the target (usually) must have the same
-    # shape as the predictions
+    # With the Keras API, the target (usually) must have the same
+    # shape as the predictions.
     # However, we only need to update the network for the actions
-    # which were actually taken
-    # we can accomplish this by setting the target to be equal to
-    # the prediction for all values
-    # then only change the targets for the actions taken
+    # which were actually taken.
+    # We can accomplish this by setting the target to be equal to
+    # the prediction for all values.
+    # Then, only change the targets for the actions taken.
     # Q(s,a)
     target_full = self.model.predict(states)
-    target_full[np.arange(batch_size), actions] = target  # (row,col)
+    target_full[np.arange(batch_size), actions] = target
 
     # Run one training step
     self.model.train_on_batch(states, target_full)
@@ -323,9 +322,7 @@ def play_one_episode(agent, env, is_train):
       agent.replay(batch_size)
     state = next_state
 
-  return info('cur_val')
-
-######### MAIN PROGRAM ##################
+  return info['cur_val']
 
 
 if __name__ == '__main__':
@@ -356,7 +353,7 @@ if __name__ == '__main__':
   env = MultiStockEnv(train_data, initial_investment)
   state_size = env.state_dim
   action_size = len(env.action_space)
-  agent = DQNAgetn(state_size, action_size)
+  agent = DQNAgent(state_size, action_size)
   scaler = get_scaler(env)
 
   # store the final value of the portfolio (end of episode)
@@ -382,17 +379,17 @@ if __name__ == '__main__':
     t0 = datetime.now()
     val = play_one_episode(agent, env, args.mode)
     dt = datetime.now() - t0
-    print(f"episode: {e + 1}/{num_episodes}, episode and value: {val:.2f},duration: {dt}")
+    print(f"episode: {e + 1}/{num_episodes}, episode end value: {val:.2f}, duration: {dt}")
     portfolio_value.append(val)  # append episode end portfolio value
 
   # save the weights when we are done
   if args.mode == 'train':
     # save the DQN
-    agent.save(f'{model_folder}/dqn.h5')
+    agent.save(f'{models_folder}/dqn.h5')
 
     # save the scaler
     with open(f'{models_folder}/scaler.pkl', 'wb') as f:
       pickle.dump(scaler, f)
 
-  # save portfolio value  for each episode
+  # save portfolio value for each episode
   np.save(f'{rewards_folder}/{args.mode}.npy', portfolio_value)
