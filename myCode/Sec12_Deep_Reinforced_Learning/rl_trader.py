@@ -35,7 +35,7 @@ def get_data():
 
 ### The experience replay memory ###
 class ReplayBuffer:
-  def _init__(self,obs_dim,act_dim,size):
+  def __init__(self,obs_dim,act_dim,size):
     self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32) # state
     self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32) # next state
     self.acts_buf = np.zeros(size, dtype=np.unit8) # actions
