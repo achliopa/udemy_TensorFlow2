@@ -5167,4 +5167,178 @@ r = model2.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=5)
 
 ### Lecture 99. Differences Between Tensorflow 1.x and Tensorflow 2.x
 
+* TF2 is simpler than TF1 at high level
+* Keras API is the same for TF1 and TF2 but in TF2 is built and the standard
+* In TF1 its was not lie this, we could use a Conv layer from
+  * `tf.layers.conv2d`
+  * `tf.contrib.layers.conv2d`
+  * build one layer using tf.nn.conv2d, tf.nn.bias_add, tf.nn.max_pool
+* The trend is to use prebuilt layers so in TF2 it has been removed
+* `tf.contrib` module of TF1 has been moved
+* We can stll build custom layers in TF2 using the Keras API
+  * we need to conform to the Keras APi using subclassing
+```
+class Mylayer(tf.keras.layers.Layer):
+  # your code here #
+```
+* TF 2 uses eager execution by default. sessions are not used any more
+* in TF1 code like
+```
+a = tf.constant(1)
+b = tf.constant(2)
+c = a + b
+print(c) # not 3!
+```
+
+* does mot return 3 but tensors. with c = a + b we define computation graph based on tensors
+* we are not computing the value of c but telling Tensorflow how to compute it when it will run
+* this makes sense in the context of placeholders
+* the TF1 way is build the graph and then run a session passing in data
+```
+a = tf.Variable(1)
+b = tf.Variable(2)
+x = tf.placeholder() # no value
+yhat = a*x + b # no value
+
+with tf.Session() as session:
+  session.run(yhat,feed_dict={x: 3}) # x=3,y_hat=5
+  print(yhat) # prints 5!
+  session.run(yhat,feed_dict={x: 4}) # x=4,y_hat=6
+  print(yhat) # prints 6! 
+```
+* Sessions and graphs have noting to do with the Math behind Deep Learning
+* Eager Execution removes need for session. code executes as we see it like regula Python
+* in Last versions of TF1 eager exectuin is optional. in TF2 is default
+* Sessions and graphs is a lgacy inherited to TF from Theano, the first GPU enabled DL lib
+* the graph was compiles for the HW (GPU) so it would be fast
+* Keras compile does that.. Keras did the trick to remove sessions
+* without sessions/graphs TF is less efficient. solution in TF2 is `@tf.function` decorator
+
+### Lecture 100. Constants and Basic Computation
+
+* we showcase basinc computation using TF2 in a notebook
+```
+a = tf.constant(3.0)
+b = tf.constant(4.0)
+c = tf.sqrt(a**2 + b**2) 
+print("c:", c)
+print(f"c: {c}") # or print using interpolation
+```
+* we see that c is a scalar Tensor with a value 5.0 `c: tf.Tensor(5.0, shape=(), dtype=float3`
+* using string uinteprolation print we get only the value
+* we can covert it with numpy `c.numpy()` to a float as we see with `type(c.numpy())`
+* tensorflow treats lists as arrays just like numpy
+```
+a = tf.constant([1,2,3])
+b = tf.constant([4,5,6])
+```
+* note that tf has its own math methods like numpy optimized for tensors
+```
+c = tf.tensordot(a,b, axes=[0,0])
+print(f"c: {c}")
+```
+* we confirm the numpy way `a.numpy().dot(b.numpy())`
+* we know how to do matrix multiplication in numpy
+```
+import numpy as np
+A0 = np.random.randn(3,3)
+b0 = np.random.randn(3,1)
+c0 = A0.dot(b0)
+print(f"c0: {c0}")
+```
+* the tensorflow way is
+```
+A = tf.constant(A0)
+b = tf.constant(b0)
+c = tf.matmul(A,b)
+print(f"c: {c}")
+```
+* in math when we want to add tensors and matrices they must be same size. in numpy it is not needed. we can add scalar to matrix but not mattixes of different size. value broadcasting rules do not allow it.
+* same holds for TF
+```
+A = tf.constant([[1,2],[3,4]])
+b = tf.constant(1)
+c = A + b
+print(f"c: {c}")
+``` 
+* elementwise multiplication in TF is like numpy
+```
+A = tf.constant([[1,2],[3,4]])
+B = tf.constant([[2,3],[4,5]])
+C = A * B
+print(f"c: {c}")
+```
+
+### Lecture 101. Variables and Gradient Tape
+
+* tuples in Python are immutables. like constants
+* python lists are mutable
+* tensorflow supports variables 
+```
+a = tf.Variable(5.)
+b = tf.Variable(3.)
+print(a*b)
+a = a + 1
+a
+c = tf.constant(4.)
+print(a + b + c)
+```
+
+* constants and variables can be mixed in TF computations. both are tensors..
+* tf variables are perfect to repsresent model params. we can update them
+* if they were constants we could not do that
+* in TF gradient tape is used to calculate gradients. it records the valies in a tape that is used afterwards to calculate the gradient.
+* we showcase it in a manual gradient descent on a loss  code
+```
+# L(w) = w**2
+
+w = tf.Variable(5.)
+
+# calc the gradient of w
+
+def get_loss(w):
+  return w ** 2
+
+def get_grad(w):
+  with tf.GradientTape() as tape:
+    L = get_loss(w)
+  g = tape.gradient(L,w)
+  return g
+
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+
+# do the training to minimize loss
+
+losses = []
+
+for i in range(50):
+  g = get_grad(w)
+  optimizer.apply_gradients(zip([g], [w]))
+  # in most general case we might have multiple gradients and multiple corresponding vars, expressed as lists
+  # e.g g = [g1,g2,g3] and w = [w1,w2,w3]
+  # the correct way to pass them into apply_gradients is as a list of tuples [(g1,w1),(g2,w2),(g3,w3)]
+  losses.append(get_loss(w))
+```
+
+* we plot the losses and see the optimizer getting good results
+```
+import matplotlib.pyplot as plt
+plt.plot(losses)
+print(f"Final loss: {get_loss(w)}")
+```
+
+* we will do the computation manually using tf
+```
+w = tf.Variable(5.)
+losses2 = []
+
+for i in range(50):
+  w.assign(w - 0.1 * 2 * w) # we do the optimizer callculation
+  losses2.append(w ** 2)
+```
+
+* we plot both losses and are equal
+
+### Lecture 102. Build Your Own Custom Model
+
 * 
