@@ -4992,4 +4992,179 @@ print(j)
 
 ### Lecture 95. Tensorflow Lite (TFLite)
 
+* TF Lite is a set of tools for thse who want to use ML (TF style) in Mobile or Embedded apps
+* Workflow
+* 1. Train the model. 
+  * we want to do this on desktop or servers that offer power
+  * train on desktop then trasfer the model (and weights) to the mobile device
+  * once on the device the model is used for prediction/inference
+* 2. Use TF Lite Converter to convert the model to a .tflite file
+  * our model might have been created using verious APIs but we will assume its Keras. the workflow is the same
+  * .tflite is just another "type of file", like the .h5 file from model.save()
+  * converting to .tflite is just a few lines of python after importing tf
+* 3. on mobile side TF Lite library is used
+  * in C++/Java (Android)
+  * in Swift/Objective-C (iOS)
+  * we use the TF Lite interpreter to load in the .tflite file and make predictions with the model
+* Mobile developer should convert data from their format to the right format for TF Lite interpreter
+  * e.g we use android SDK to  grab an image from the camera
+  * tsnsorflow does not accept image objects as input
+  * there is no Numpy library for C++ and Java
+  * mobile dev must convert image to an array of floats
+  * e.g our model might be looking for pixel values in [0,1] or [-1.1]
+* code to convert model to TF Lite format
+```
+# Convert the model to TFLite format
+# create a converter object
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+
+# Convert the model
+tflite_model = converter.convert()
+
+# Save to file
+with open("converted_model.tflite", "wb") as f:
+  f.write(tflite_model)
+```
+* in TF1 we dont need tp save our model to .h5 file first
+* we always have the option to host our model in the cloud and use TF Serving API on our device. this requires connection to internet
+* there are a lot of pretrained models out there in TF lite format ready to be used [TF Lite model ready to use](https://www.tensorflow.org/lite/models/)
+
+### Lecture 96. Why is Google the King of Distributed Computing?
+
+* real life problems involve large datasets. unlike courses
+* serching in a file of size 100GB is impracical with python
+* if cloud computing was unavailable we would need mutiple available machines to split data in batches and process them
+* Google came up with idea of distributed computing using MapReduce
+* split data into 1000workers and then assembly results.
+* Other Google Distributed Technologies
+  * BigTable - distributed NoSQL DB
+  * GFS - Google File System (sharding, replication)
+  * Spanner - global NewSQL DB spread across the globe
+* There is even distributed training of NNs
+* DownpourSGD is an algorithm that dows that Distributed NN Trainign (Jeff Dean Google Brain)
+* Today distriuted training is easy thanks to TF2
+  * multiple methods available called "distribution strategies"
+* MirroredStrategy is available
+* MultiWorkerMorroredStrategy is experimental so it CentralStorageStrategy
+* Even with 1 machine with GPU we van do great things with Distributed Training
+  * we can do even more with multiple machines with multiple GPUs
+* MirroredStrategy
+  * Data Parallelism
+  * e,g 1000 training samples and 10 GPUs
+  * send 100 samples to each GPU
+  * send shard of input to each device. collect output and update model vars
+* Multiple Workers Mirorred Strategy 
+  * how about multiple workers each with multiple GPUs? also possible
+  * just change 1 line of code (still experimental)
+```
+strategy = MirroredStrategy()
+vs.
+strategy = MultiWorkerMirroredStrategy()
+
+with strategy,scope():
+  model = ....
+  model.compile(loss=...)
+```
+* we need to set TF_CONFIG env var and actually setup each of the machines
+
+### Lecture 97. Training with Distributed Strategies
+
+* we showcase MirroredStrategy and distributed TF Model Training in a Colab Notebook
+* First we do it the vanilla way and then we will ddo the mods for distributed training
+```
+# additional imports
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.layers import Input,Dense,Conv2D,Flatten, Dropout, GlobalMaxPooling2D, MaxPooling2D, BatchNormalization
+from tensorflow.keras.models import Model
+
+# Load in the Data
+cifar10 = tf.keras.datasets.cifar10
+
+(x_train,y_train), (x_test,y_test) = cifar10.load_data()
+x_train,x_test = x_train/255.0, x_test/255.0
+y_train, y_test = y_train.flatten(), y_test.flatten()
+print("x_train.shape", x_train.shape)
+print("y_train.shape", y_train.shape)
+# number of classes
+K = len(set(y_train))
+print("number of classes", K)
+# Build the model using the functional API
+def create_model():
+  i = Input(shape=x_train[0].shape)
+  
+  x = Conv2D(32, (3, 3), activation='relu', padding='same')(i)
+  x = BatchNormalization()(x)
+  x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+  x = BatchNormalization()(x)
+  x = MaxPooling2D((2, 2))(x)
+  x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+  x = BatchNormalization()(x)
+  x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+  x = BatchNormalization()(x)
+  x = MaxPooling2D((2, 2))(x)
+  x = Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+  x = BatchNormalization()(x)
+  x = Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+  x = BatchNormalization()(x)
+  x = MaxPooling2D((2, 2))(x)
+
+  x = Flatten()(x)
+  x = Dropout(0.2)(x)
+  x = Dense(1024, activation='relu')(x)
+  x = Dropout(0.2)(x)
+  x = Dense(K, activation='softmax')(x)
+
+  model = Model(i, x)
+  return model
+```
+* till now all is as before... now we choose a strategy
+```
+strategy = tf.distribute.MirroredStrategy()
+```
+
+* we print out the num of devices in synch `print(f"Number of devices: {strategy.num_replicas_in_sync}" )`
+
+* we compile the mod el in the context of the strategy
+```
+with strategy.scope():
+  model = create_model()
+
+  model.compile(loss="sparse_categorical_crossentropy",
+                optimizer="adam",
+                metrics=["accuracy"])
+```
+* we fit the model as normal using batches outside the scope
+```
+# Fit
+r = model.fit(x_train,y_train,validation_data=(x_test,y_test),batch_size=128,epochs=15)
+```
+* its distributed so goes faster (if w have machines)
+* the num of steps is. numofspamples/batch size
+* so sending a batch to a diff machine we get 128x speed gain
+* to see the speed gain we run our model (compile) outside the strategy so on one machine
+```
+# Compare this to non-distributed training
+model2 = create_model()
+model2.compile(loss='sparse_categorical_crossentropy',
+                optimizer='adam',
+                metrics=['accuracy'])
+r = model2.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=5)
+```
+* to speed up training we should increase batch size depending on the GPU capabilities (CUDA sharding)
+* If we want >1 machine or >1 GPU?
+  * we should strive to write code that with minimum changes can run on such a config
+  * Try a simple solutions before go hard
+* Amazon offers  up to P3 instance with 96 CPUs and 8 GPUS of 32GB each
+* When we start in EC2 in AWS we can opt to use  AMI which install all ML libraries. also Amazon offers Deep Learning AMI with tensorflow in
+
+### Lecture 98. Using the TPU
+
+* TPUStrategy is experimental for Tensorflow 2 and still buggy.
+* (How to use TPU in TF2)[https://stackoverflow.com/questions/55541881/how-to-convert-tf-keras-model-to-tpu-using-tensorflow-2-0-in-google-colab]
+
+## Section 14: Low-Level Tensorflow
+
+### Lecture 99. Differences Between Tensorflow 1.x and Tensorflow 2.x
+
 * 
