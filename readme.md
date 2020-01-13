@@ -5444,4 +5444,193 @@ plt.plot(x_axis,y_axis)
 
 ### Lecture 103. Mean Squared Error
 
+* Error = Cost = Error
+* MSE = (1/N)Σ[i=1->N](yi-yhati)^2
+* its square because we want the error to always be positive
+* if we want to just keep it positive we can use MAE = (1/N)Σ[i=1->N]|yi-yhati| or Mean Absolute Error
+* But Linear Reg is synonymous to MSE
+* Why??
+  * Mean is μhat = (1/N)Σ[i=1->Ν]xi where x are  datapoints
+  * Likelyhood function L = Π[i=1->N]p(xi) = Π[i=1->N](1/sqrt(2πσ^2))exp((-1/2)(xi-μ)^2/s^2) x are our samples. Likehood stems from the product of all sample probability desnsity functions which are Gausian distributions. μ is the var. x are constants
+  * we want to maximize L with respect to μ. we want it to be big when x is close to μ
+  * set dL/dμ=0 and solve for μ.. this is hard. log can get good results as it is a monotonic increasing function. maximizing logL is the same if we solve for μ
+  * l = logL = Σ[i=1->N]{log(1/sqrt(2πσ^2))- (1/2s^2)(xi-μ)^2}
+  * δl/δμ = Σ[i=1->N](1/σ^2)(xi-μ) if we set to 0 and solve we get μhat definition
+  * l function has 2 constants. l = C1 - C2Σ[i=1->N](xi-μ)^2. which do not affect the result so we set C1=0 and C2=1/N
+  * we see that the likelihood we want to maximise is l = -1/NΣ[i=1->N](xi-μ)^2
+  * maximizing sthing is the equivialent of minimizing its negative
+  * Maximizing likelihood is the same as minimizing the Error... and what we got here is MSE. thats why its the default for regression where the estimates yhat s the equivalent as μ the calculated mean using gaussian distribution... 
+  * so its like choosing the best mean to achieve maximum likelihood
+  * When we use the squared error, we a re making the assumption that the error of our model with respect to the data is the Gaussian Distribution with mean zero: y ~ N(yhat,σ^2) <-> y-yhat ~ N(0,σ^2)
+
+### Lecture 104. Binary Cross Entropy
+
+* Loss = -(1/N)Σ[i=1->N]{yilogyhati + (1-yi)log(1-yhati)}
+* This is the correct loss function to use for binary classification
+* Why?
+  * the outcomes in binary classification are binary
+  * what disctribution describes binari events?? The Bernoulli distribution e.g μhat = # heads/# total in a coin tos problem
+  * data samples are x0,x1,...xN (0or1)
+  * PMF (prob mass function ) of Bernoulli is p(x) = μ^x(1-μ)^(1-χ)
+  * For coninious  random vars we use PDF (prob density function or Gaussian)
+  * For discrete random vars we use PMF which returns probability
+  * Like in MSE we follow the same course of thought
+  * Likelihood iσ L = Π[i=1->N]p(xi) = Π[i=1->N]μ^xi(1-μ)^(1-xi)
+  * we want to maximize L so again we go to l = logL = Σ[i=1->N]{xilogμ + (1-xi)log(1-μ)}
+  * we calc δl/δμ=Σ[i=1->Ν](xi/μ - (1-xi)/(1-μ)) set it to 0 and solve for μ to get μhat = 1/NΣ[i=1->N]xi xs are 1s as 0s dont contribute. so its the μhat we saw in our example
+  * Negative log Likelihood ( no need to play with constants like in MSE now) is -logL = -Σ[i=1->N]{xilogμ + (1-xi)log(1-μ)} x is random val , μ is the prob of 1
+  * So for binary classification (y is random val, yhat is the probability of 1) Loss is -(1/N)Σ[i=1->N]{yilogyhati + (1-yi)log(1-yhati)} aka binary cross 
+  entropy
+* dividing by N makes our loss invariant to num of samples
+
+### Lecture 105. Categorical Cross Entropy
+
+* we follow the same pattern like before.. we just need to know the distribution for categorical problems. like Bernoulli is for binary
+* its the Categorical Distribution. we use die roll as example with K posile outcomes
+* Categorical PMF is p(x) = Π[k=1->K]μk^(1(x=k))
+  * the 1(x) function is the indicator function retturns 1 if argument is true, 0 otherwise
+  * easy to confirm that p(x1-μ1,p(x2)=μ2 etc
+* our samples are x1,x2,...,xN
+* Likelihood is L = Π[i=1->N]p(xi) = Π[i=1->N]Π[k=1->K]μk^(1(x=k)) its a matrix
+* l = logL is Σ[i-1->N]Σ[k=1->K]1(xi=k)logμκ 
+* we dont go to prove the μhat equation. we know by know it holds...
+* negative l is the Categorical Cross-Entropy = - Σ[i-1->N]Σ[k=1->K]yiklogyhatik
+  * no more indicator function
+  * y1k is one-hot encoded value
+  * i = sample index k = class label
+  * class label can only have one value for each sample
+* one-hot encoding is inefficient. 0s dont contribute only 1s
+* in numpy we can use doble indexing. not hot encoding yhat[i=1,k=1]
+* general code yhat[np.arange(N),y]
+* the regular categorical cross-entropy uses the full NxK target (requires NxK mults/additions)
+* the sparse categorical cross-entropy uses the original target [1-D array]. requires only N multiplications/additions
+
+## Section 16: In-Depth: Gradient Descent
+
+### Lecture 106. Gradient Descent
+
 * 
+
+## Section 18: Setting up your Environment
+
+### Lecture 112. How to install Numpy, Scipy, Matplotlib, Pandas, IPython, Theano, and TensorFlow
+
+* use Linux or Anaconda in Windows
+* use pip `sudo pip install`
+* to install pip `sudo easy_install pip`
+* virtual box with ubuntu distro is ok to work with Python libs
+* in ubuntu using apt-get install is valid to install python-numpy python-scipy etc.... prefer pip
+
+### Lecture 114. Installing NVIDIA GPU-Accelerated Deep Learning Libraries on your Home Computer
+
+* [blog article](https://lazyprogrammer.me/how-to-setup-nvidia-gpu-laptop-with-ubuntu-for-deep-learning-cuda-and-cudnn/)
+* we need NVIDIA GPU and specific libraries (CUDA or CuDNN)
+* we need large quantities of GPU RAM >4GB to process batch    
+* we can use GPU enabled instances in AWS
+* Thinkpads are good with Linux
+* install Linux 
+* GPU drivers allow us to use the HW. CUDA drivers for NVIDIA
+* we need latest CUDA possible
+* do DUAL boot
+* CUDA is easy on Windows. Windows OS on Thinkpad has preinstalled CUDA
+* in linux
+  * Here is a method that consistently works for me:
+  * Go to [nvidia](https://developer.nvidia.com/cuda-downloads) and choose the options appropriate for your system. (Linux / x86_64 (64-bit) / Ubuntu / etc.). Note that Pop!_OS is a derivative of Ubuntu, as is Linux Mint.
+  * You’ll download a .deb file. Do the usual “dpkg -i <filename>.deb” to run the installer. CUDA is installed!
+  * Next, you’ll want to install CuDNN. Instructions from NVIDIA are [here](https://docs.nvidia.com/deeplearning/sdk/cudnn-install/index.html#ubuntu-network-installation)
+  * Those instructions are subject to change, but basically you can just copy and paste what they give you (don’t copy the below, check the site to get the latest version):
+```
+sudo dpkg -i \ http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64/nvidia-machine-learning-repo-ubuntu1604_1.0.0-1_amd64.deb
+sudo apt-get update && sudo apt-get install libcudnn7 libcudnn7-dev
+```
+* instead of trying to update CUDA erase linux distro and install a new one...
+* for CuDNN on windows go to NVIDIA site and follow instructions
+* Installing GPU-enabled Tensorflow
+  * Unlike the other libraries we’ll discuss, there are different packages to separate the CPU and GPU versions of Tensorflow.
+  * The Tensorflow website will give you the exact command to run to install Tensorflow (it’s the same whether you are in Anaconda or not).
+  * It will look like this:
+```
+tensorflow
+tensorflow-gpu
+```
+  * So you would install it using either:
+```
+pip install tensorflow
+pip install tensorflow-gpu
+```
+  * Since this article is about GPU-enabled deep learning, you’ll want to install tensorflow-gpu.
+  * UPDATE: Starting with version 2.1, installing “tensorflow” will automatically give you GPU capabilities, so there’s no need to install a GPU-specific version (although the syntax still works).
+  * After installing Tensorflow, you can verify that it is using the GPU: `tf.test.is_gpu_available()`
+  * This will return True if Tensorflow is using the GPU.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    m ]
