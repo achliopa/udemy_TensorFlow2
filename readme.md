@@ -5509,7 +5509,76 @@ plt.plot(x_axis,y_axis)
 
 ### Lecture 106. Gradient Descent
 
-* 
+* We use GD to train all models
+* used to train ML models
+  * K-means clustering
+  * Hidden Markov models
+  * Matrix factorization
+* Why we use it?
+  * to minimize loss/cost L with respect to model params (w)
+  * To find min or max of a function we calc its derivative and set it to zero
+  * How do we know its a min and not max..?
+  * What about local minima or saddle points?
+  * sometimes an derivative cannot be solved to 0
+  * we use approximations using integrals
+  * if we cannot solve integral we draw trapezoids and find their area instead
+* Idea of GD.
+  * if we repeatedly take small steps in the direction of the gradient to find a new w
+  at each step L(w) decreases provided the step size is small
+  * eventually it will converge to minimum
+* Its a for loop
+```
+w = random value
+for i in range(num_epochs):
+  w = w - η GradL(w) # GradL(w) = dL/dw
+```
+* Each iteration of the loop is called epoch. we must have enough for convergence
+* η is the learning rate. small enough so that the cost does not blow and high enough so that it does not take forever
+
+### Lecture 107. Stochastic Gradient Descent
+
+* in Keras and TF2 we extensively use SGD.
+* to understand term Stochastic we use an example:
+  * say we want to measure the height of all people in the world
+  * it will take forever to ask 7billion beople
+  * we sample 1000 random people and take average
+* In DL we have to calculate cost and from this the gradient
+* in imagenet there are 1million images... to get the MSE of 1million for cost calc (MSE) is 1million per iteration
+* we can downsample our dataset to same time on cost calculations, gradient should be similar but more easy to get
+* In Stochastic (Batch) Gradent Descent typically we use small batch sizes like 32,64 or 128
+```
+for epoch in range(epochs):
+  X,Y = shuffle(X,Y)
+  for i in range(N // 32):
+    start = i * 32
+    end = (i + 1) * 32
+    X_batch, Y_batch = X[start:end], Y[start:end]
+    # do one step of GD using X_batch, Y_batch
+```
+* we can set batch size = dataset to try non stocastic GD.
+
+### Lecture 108. Momentum
+
+* this can improve SGD by 80%
+* without momentum each time we want to move in Gradient Descent there has to be a gradient in order to move
+* Without momentum: θt <- θt-1 - ηgt (if gt is 0 there is no change)
+* With momentum:
+  * νt <- μνt-1 -ηgt
+  * θt <- θt-1 - νt 
+  * μ is the momentum (vals 0.9 , 095, 0.99) setting μ=0 we get plain GD
+  * with momentum we converge faster. we take bigger step in the shallow gradient
+
+### Lecture 109. Variable and Adaptive Learning Rates
+
+* variable learning rate is a lr as a time function η(t)
+* AKA "Learning Rate Scheduling"
+* 1: Step Decay (decrease at each step by a factor)
+* 2: Exponential decay `η(t)=A*exp(-kt)`
+* 3: 1/t Decay `η(t)=A/(kt+1)` slower dropoff than exp
+* In all these lr decreases over time.
+* At first weights are suoptimal. but as we converge we need smaller learning rate to fine tune and avoid overshoot (bounce)
+* Babysitting method. monitor cost and adjust
+* Adarad is an adaptive technique. it adapts te learning rate to each param depending on the overall
 
 ## Section 18: Setting up your Environment
 
@@ -5520,6 +5589,8 @@ plt.plot(x_axis,y_axis)
 * to install pip `sudo easy_install pip`
 * virtual box with ubuntu distro is ok to work with Python libs
 * in ubuntu using apt-get install is valid to install python-numpy python-scipy etc.... prefer pip
+* both hyper params in trial and error
+* we can automatize them with bayesian automation
 
 ### Lecture 114. Installing NVIDIA GPU-Accelerated Deep Learning Libraries on your Home Computer
 
