@@ -5578,7 +5578,41 @@ for epoch in range(epochs):
 * In all these lr decreases over time.
 * At first weights are suoptimal. but as we converge we need smaller learning rate to fine tune and avoid overshoot (bounce)
 * Babysitting method. monitor cost and adjust
-* Adarad is an adaptive technique. it adapts te learning rate to each param depending on the overall
+* AdaGrad is an adaptive technique. it adapts te learning rate to each parameter individualy depending on the overall progress
+  * we introduce a variable called cache. cache = catch + gradient^2
+  * θ <- θ - ηgradJ/sqrt(cache+ε)
+  * typically ε is very small. 10^-8 to 10^-10 to avoid zero division
+  * cache is updated at every batch (batch gradient descent) 
+  * it accumulates depending on past gradients.
+  * large past gradients => large cach => small learning rate
+  * everything is element wise
+  * every scalar param and its lr is updated independently
+* RMSProp (Adaptive technique improved AdaGrad)
+  * AdaGrad decreases lr rapidly
+  * since cache grows rapidly , lets decrease t at each update
+  * cache = decay * cache + (1-decay) * gradient^2
+  * decay vals 0.99, 0.999
+  * leaky cache
+  * whats the initial value of cache ?
+  * one might automatically assume 0, let decay = 0.999. initial cach is small and lr very large
+  * better set initial cache to 1
+* AdaGrad Pseudocode
+```
+# at every batch
+cache += gradient ** 2
+param = param - learning_rate * gradient / sqrt(cache+epsilon)
+```
+* RMSProp
+```
+# at every batch
+cache = decay * cache + (1 - decay) * gradient ** 2
+param = param - learning_rate * gradient / sqrt(cache+epsilon) # decay=0.9, 0.99 epsilon 10^-8 or less
+```
+
+### Lecture 110. Adam
+
+* 
+
 
 ## Section 18: Setting up your Environment
 
