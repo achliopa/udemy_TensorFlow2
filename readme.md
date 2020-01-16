@@ -5611,8 +5611,31 @@ param = param - learning_rate * gradient / sqrt(cache+epsilon) # decay=0.9, 0.99
 
 ### Lecture 110. Adam
 
-* 
-
+* Adam Optimizer is the goto solution
+* We call it "RMSprop with momentum"
+* But. TF has RMSProp to which we can add Momentum (but this is not Adam)
+* Hint: check Exponentially-Smoothed Averages in  "Batch-Normalization"
+  * Sample mean: Xmean = 1/T(Σ[t=1->T]Xt
+  * To reduce calculations calculate Mean based on prev mean and current X: MT=(1-1/T)MT-1 + 1/TXT
+  * set 1/T to a constant called decay (it looks like RMSProp) MT = decayMT-1 + (1-decay)XT
+  * cache estimates the avg of the squared
+  *  we use square root of cache. RMS = root mean square
+  *  vt = decay * vt-1 + (1-decay) *  g^2 ~~ mean(g^2)
+* Mean AKA Expected Value (we know that) so v ~~ E(g^2) v stands for variance
+* E(X^2) is called second moment of X
+* 1st moment mt = μmt-1 + (1-μ)gt (m ~~ E(g))
+* Adam makes use of 1st and 2nd moment (Adaptive moment estimation)
+* update of m looks like momentum (thus RMSProp w/ momentum)
+* Adma is a combo of m and v
+* Adam works like a smoothing function following the trend of a signal (Low pass filter)
+* like aRMSprop we have an issu on what is the init value
+* if we set to 0 our output will be biased to 0 and then stat to follow the signal
+* We can use Bias Correction: Yhat(t) = Y(t)/(1-decay^t) even with decay of 0.99 it works
+* Using bias correction
+  * mhatt=mt/(1-β1^T)
+  * vhatt=vt/(1-β2^T)
+  * Adam update: θt+1 <- θt - ηmhatt/sqrt(vhatt +ε) β1,β2 typically 0.9 - 0999 ε 10^-8  to 10^-10
+* A paper of 2017 shows that experimental results show that regular GD performs better than adaptive techniques
 
 ## Section 18: Setting up your Environment
 
